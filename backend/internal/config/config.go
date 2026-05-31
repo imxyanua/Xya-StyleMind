@@ -8,8 +8,9 @@ import (
 )
 
 type Config struct {
-	Port     string
-	Database DatabaseConfig
+	Port      string
+	JWTSecret string
+	Database  DatabaseConfig
 }
 
 type DatabaseConfig struct {
@@ -26,7 +27,8 @@ func Load() Config {
 	}
 
 	cfg := Config{
-		Port: getEnv("PORT", "8080"),
+		Port:      getEnv("PORT", "8080"),
+		JWTSecret: getEnv("JWT_SECRET", "change-me-in-production"),
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnv("DB_PORT", "5432"),

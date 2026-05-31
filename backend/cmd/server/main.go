@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"stylemind/internal/auth"
 	"stylemind/internal/config"
 	"stylemind/internal/database"
 	"stylemind/internal/health"
@@ -37,6 +38,9 @@ func main() {
 
 	api := router.Group("/api/v1")
 	health.RegisterRoutes(api, db)
+	authRepo := auth.NewRepository(db)
+	authService := auth.NewService(authRepo, cfg.JWTSecret)
+	auth.RegisterRoutes(api, authService, middleware.JWTAuth(cfg.JWTSecret))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
