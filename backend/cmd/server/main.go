@@ -11,10 +11,12 @@ import (
 	"time"
 
 	"stylemind/internal/auth"
+	"stylemind/internal/category"
 	"stylemind/internal/config"
 	"stylemind/internal/database"
 	"stylemind/internal/health"
 	"stylemind/internal/middleware"
+	"stylemind/internal/product"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -32,15 +34,30 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := database.RunMigrations(ctx, db, "migrations"); err != nil {
+		log.Fatalf("migration failed: %v", err)
+	}
+
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
 	router.Use(cors.New(middleware.CORSConfig()))
 
 	api := router.Group("/api/v1")
 	health.RegisterRoutes(api, db)
+
 	authRepo := auth.NewRepository(db)
 	authService := auth.NewService(authRepo, cfg.JWTSecret)
-	auth.RegisterRoutes(api, authService, middleware.JWTAuth(cfg.JWTSecret))
+	jwtAuth := middleware.JWTAuth(cfg.JWTSecret)
+	auth.RegisterRoutes(api, authService, jwtAuth)
+
+	admin := api.Group("/admin")
+	admin.Use(jwtAuth, middleware.RequireRole("admin"))
+
+	categoryRepo := category.NewRepository(db)
+	category.RegisterRoutes(api, admin, categoryRepo)
+
+	productRepo := product.NewRepository(db)
+	product.RegisterRoutes(api, admin, productRepo)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
