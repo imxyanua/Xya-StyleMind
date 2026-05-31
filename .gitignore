@@ -1,3 +1,11 @@
+AGENTS.md
+CLAUDE.md
+SYSTEM_DESIGN.md
+docs/SYSTEM_DESIGN.md
+frontend/AGENTS.md
+frontend/CLAUDE.md
+
+# Environment files
 .env
 .env.*
 !.env.example
@@ -21,14 +29,12 @@ data/
 tmp/
 logs/
 
-# Build / coverage
+# Build artifacts
+node_modules/
+.next/
 dist/
 build/
 coverage/
 
 # OS files
 .DS_Store
-
-# Go local
-bin/
-vendor/
