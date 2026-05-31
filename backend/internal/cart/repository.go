@@ -3,15 +3,11 @@ package cart
 import (
 	"context"
 	"errors"
+	"stylemind/internal/errs"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-)
-
-var (
-	ErrCartItemNotFound = errors.New("cart item not found")
-	ErrProductNotFound  = errors.New("product not found")
 )
 
 type Repository struct {
@@ -58,7 +54,7 @@ func (r *Repository) GetProductSnapshot(ctx context.Context, productID string) (
 	`, productID).Scan(&p.ID, &p.Name, &p.Price, &p.Stock, &p.ImageURL, &p.Style, &p.Color)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrProductNotFound
+			return nil, errs.ErrProductNotFound
 		}
 		return nil, err
 	}
@@ -74,7 +70,7 @@ func (r *Repository) GetCartItemByProduct(ctx context.Context, cartID, productID
 	`, cartID, productID).Scan(&item.ID, &item.CartID, &item.ProductID, &item.Quantity, &item.CreatedAt, &item.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrCartItemNotFound
+			return nil, errs.ErrCartItemNotFound
 		}
 		return nil, err
 	}
@@ -99,7 +95,7 @@ func (r *Repository) UpdateCartItemQuantity(ctx context.Context, itemID string, 
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return ErrCartItemNotFound
+		return errs.ErrCartItemNotFound
 	}
 	return nil
 }
@@ -118,7 +114,7 @@ func (r *Repository) GetCartItemByID(ctx context.Context, cartID, itemID string)
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrCartItemNotFound
+			return nil, errs.ErrCartItemNotFound
 		}
 		return nil, err
 	}
@@ -131,7 +127,7 @@ func (r *Repository) DeleteCartItem(ctx context.Context, cartID, itemID string) 
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return ErrCartItemNotFound
+		return errs.ErrCartItemNotFound
 	}
 	return nil
 }

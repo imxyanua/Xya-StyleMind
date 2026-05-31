@@ -16,14 +16,20 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) List(ctx context.Context) ([]Category, error) {
+func (r *Repository) List(ctx context.Context, limit, offset int) ([]Category, int64, error) {
+	var total int64
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM categories`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
 	rows, err := r.db.Query(ctx, `
 		SELECT id, name, slug, created_at, updated_at
 		FROM categories
 		ORDER BY name ASC
-	`)
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -31,11 +37,11 @@ func (r *Repository) List(ctx context.Context) ([]Category, error) {
 	for rows.Next() {
 		var c Category
 		if err := rows.Scan(&c.ID, &c.Name, &c.Slug, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		categories = append(categories, c)
 	}
-	return categories, rows.Err()
+	return categories, total, rows.Err()
 }
 
 func (r *Repository) Create(ctx context.Context, req CreateCategoryRequest) (*Category, error) {

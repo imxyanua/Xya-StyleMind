@@ -6,7 +6,7 @@ type APIResponse struct {
 	Success bool        `json:"success"`
 	Message string      `json:"message"`
 	Data    interface{} `json:"data,omitempty"`
-	Error   interface{} `json:"error,omitempty"`
+	Meta    interface{} `json:"meta,omitempty"`
 }
 
 func Success(c *gin.Context, code int, message string, data interface{}) {
@@ -17,10 +17,18 @@ func Success(c *gin.Context, code int, message string, data interface{}) {
 	})
 }
 
-func Error(c *gin.Context, code int, message string, err interface{}) {
+func SuccessWithMeta(c *gin.Context, code int, message string, data interface{}, meta interface{}) {
+	c.JSON(code, APIResponse{
+		Success: true,
+		Message: message,
+		Data:    data,
+		Meta:    meta,
+	})
+}
+
+func Error(c *gin.Context, code int, message string) {
 	c.JSON(code, APIResponse{
 		Success: false,
 		Message: message,
-		Error:   err,
 	})
 }

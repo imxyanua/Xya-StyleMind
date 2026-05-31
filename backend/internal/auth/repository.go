@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"stylemind/internal/errs"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-var ErrUserNotFound = errors.New("user not found")
 
 type Repository struct {
 	db *pgxpool.Pool
@@ -40,7 +39,7 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*User, e
 		Scan(&user.ID, &user.Email, &user.FullName, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrUserNotFound
+			return nil, errs.ErrUserNotFound
 		}
 		return nil, err
 	}
@@ -58,7 +57,7 @@ func (r *Repository) GetUserByID(ctx context.Context, id string) (*User, error) 
 		Scan(&user.ID, &user.Email, &user.FullName, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrUserNotFound
+			return nil, errs.ErrUserNotFound
 		}
 		return nil, err
 	}

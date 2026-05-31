@@ -29,8 +29,8 @@ func (s *Service) Checkout(ctx context.Context, userID string) (*OrderResponse, 
 	return s.repo.GetOrderByIDForUser(ctx, orderID, userID)
 }
 
-func (s *Service) ListMyOrders(ctx context.Context, userID string) ([]OrderResponse, error) {
-	return s.repo.ListOrdersByUser(ctx, userID)
+func (s *Service) ListMyOrders(ctx context.Context, userID string, limit, offset int) ([]OrderResponse, int64, error) {
+	return s.repo.ListOrdersByUser(ctx, userID, limit, offset)
 }
 
 func (s *Service) GetMyOrder(ctx context.Context, userID, orderID string) (*OrderResponse, error) {

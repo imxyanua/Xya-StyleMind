@@ -46,10 +46,6 @@ type OrderResponse struct {
 	UpdatedAt   time.Time   `json:"updated_at"`
 }
 
-type UpdateStatusRequest struct {
-	Status string `json:"status" validate:"required,oneof=pending paid shipping completed cancelled"`
-}
-
 type CheckoutItem struct {
 	CartItemID string
 	ProductID  string

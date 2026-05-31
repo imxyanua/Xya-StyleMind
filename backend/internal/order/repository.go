@@ -3,16 +3,11 @@ package order
 import (
 	"context"
 	"errors"
+	"stylemind/internal/errs"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-)
-
-var (
-	ErrOrderNotFound = errors.New("order not found")
-	ErrCartEmpty     = errors.New("cart is empty")
-	ErrOutOfStock    = errors.New("insufficient stock for one or more items")
 )
 
 type Repository struct {
@@ -69,7 +64,7 @@ func (r *Repository) GetCheckoutItems(ctx context.Context, cartID string) ([]Che
 		return nil, err
 	}
 	if len(items) == 0 {
-		return nil, ErrCartEmpty
+		return nil, errs.ErrCartEmpty
 	}
 	return items, nil
 }
@@ -84,7 +79,7 @@ func (r *Repository) CreateOrderFromCart(ctx context.Context, userID, cartID str
 	total := 0.0
 	for _, item := range items {
 		if item.Quantity > item.Stock {
-			return "", ErrOutOfStock
+			return "", errs.ErrInsufficientStock
 		}
 		total += item.Price * float64(item.Quantity)
 	}
@@ -117,7 +112,7 @@ func (r *Repository) CreateOrderFromCart(ctx context.Context, userID, cartID str
 			return "", err
 		}
 		if tag.RowsAffected() == 0 {
-			return "", ErrOutOfStock
+			return "", errs.ErrInsufficientStock
 		}
 	}
 
@@ -132,15 +127,21 @@ func (r *Repository) CreateOrderFromCart(ctx context.Context, userID, cartID str
 	return orderID, nil
 }
 
-func (r *Repository) ListOrdersByUser(ctx context.Context, userID string) ([]OrderResponse, error) {
+func (r *Repository) ListOrdersByUser(ctx context.Context, userID string, limit, offset int) ([]OrderResponse, int64, error) {
+	var total int64
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM orders WHERE user_id = $1`, userID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
 	rows, err := r.db.Query(ctx, `
 		SELECT id, user_id, status, total_amount, created_at, updated_at
 		FROM orders
 		WHERE user_id = $1
 		ORDER BY created_at DESC
-	`, userID)
+		LIMIT $2 OFFSET $3
+	`, userID, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -148,16 +149,16 @@ func (r *Repository) ListOrdersByUser(ctx context.Context, userID string) ([]Ord
 	for rows.Next() {
 		var o OrderResponse
 		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalAmount, &o.CreatedAt, &o.UpdatedAt); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		items, err := r.GetOrderItems(ctx, o.ID)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		o.Items = items
 		out = append(out, o)
 	}
-	return out, rows.Err()
+	return out, total, rows.Err()
 }
 
 func (r *Repository) GetOrderByIDForUser(ctx context.Context, orderID, userID string) (*OrderResponse, error) {
@@ -169,7 +170,7 @@ func (r *Repository) GetOrderByIDForUser(ctx context.Context, orderID, userID st
 	`, orderID, userID).Scan(&o.ID, &o.UserID, &o.Status, &o.TotalAmount, &o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrOrderNotFound
+			return nil, errs.ErrOrderNotFound
 		}
 		return nil, err
 	}
@@ -190,7 +191,7 @@ func (r *Repository) GetOrderByID(ctx context.Context, orderID string) (*OrderRe
 	`, orderID).Scan(&o.ID, &o.UserID, &o.Status, &o.TotalAmount, &o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrOrderNotFound
+			return nil, errs.ErrOrderNotFound
 		}
 		return nil, err
 	}
@@ -212,7 +213,7 @@ func (r *Repository) UpdateOrderStatus(ctx context.Context, orderID, status stri
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return ErrOrderNotFound
+		return errs.ErrOrderNotFound
 	}
 	return nil
 }

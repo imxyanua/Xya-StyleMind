@@ -25,7 +25,7 @@ func (h *Handler) Check(c *gin.Context) {
 	defer cancel()
 
 	if err := h.db.Ping(ctx); err != nil {
-		response.Error(c, http.StatusServiceUnavailable, "database unavailable", gin.H{"database": "down"})
+		response.Error(c, http.StatusServiceUnavailable, "database unavailable")
 		return
 	}
 

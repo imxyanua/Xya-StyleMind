@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"net/http"
+	"stylemind/internal/errs"
 
 	"stylemind/pkg/response"
 	"stylemind/pkg/validator"
@@ -25,17 +26,21 @@ func RegisterRoutes(group *gin.RouterGroup, service *Service, authMiddleware gin
 func (h *Handler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
+		response.Error(c, http.StatusBadRequest, "invalid payload")
 		return
 	}
 	if err := validator.Validate.Struct(req); err != nil {
-		response.Error(c, http.StatusBadRequest, "validation failed", err.Error())
+		response.Error(c, http.StatusBadRequest, "validation failed")
 		return
 	}
 
 	result, err := h.service.Register(c.Request.Context(), req)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, "register failed", err.Error())
+		if errors.Is(err, errs.ErrEmailAlreadyExists) {
+			response.Error(c, http.StatusBadRequest, "email already exists")
+			return
+		}
+		response.Error(c, http.StatusBadRequest, "register failed")
 		return
 	}
 	response.Success(c, http.StatusCreated, "register success", result)
@@ -44,21 +49,21 @@ func (h *Handler) Register(c *gin.Context) {
 func (h *Handler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
+		response.Error(c, http.StatusBadRequest, "invalid payload")
 		return
 	}
 	if err := validator.Validate.Struct(req); err != nil {
-		response.Error(c, http.StatusBadRequest, "validation failed", err.Error())
+		response.Error(c, http.StatusBadRequest, "validation failed")
 		return
 	}
 
 	result, err := h.service.Login(c.Request.Context(), req)
 	if err != nil {
-		if errors.Is(err, ErrInvalidCredentials) {
-			response.Error(c, http.StatusUnauthorized, "login failed", "invalid email or password")
+		if errors.Is(err, errs.ErrInvalidCredentials) {
+			response.Error(c, http.StatusUnauthorized, "invalid email or password")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "login failed", err.Error())
+		response.Error(c, http.StatusInternalServerError, "login failed")
 		return
 	}
 	response.Success(c, http.StatusOK, "login success", result)

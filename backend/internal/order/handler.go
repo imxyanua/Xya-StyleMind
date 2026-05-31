@@ -3,7 +3,9 @@ package order
 import (
 	"errors"
 	"net/http"
+	"stylemind/internal/errs"
 
+	"stylemind/pkg/pagination"
 	"stylemind/pkg/response"
 	"stylemind/pkg/validator"
 
@@ -31,12 +33,12 @@ func (h *Handler) Checkout(c *gin.Context) {
 	order, err := h.service.Checkout(c.Request.Context(), userID)
 	if err != nil {
 		switch {
-		case errors.Is(err, ErrCartEmpty):
-			response.Error(c, http.StatusBadRequest, "checkout failed", err.Error())
-		case errors.Is(err, ErrOutOfStock):
-			response.Error(c, http.StatusBadRequest, "checkout failed", err.Error())
+		case errors.Is(err, errs.ErrCartEmpty):
+			response.Error(c, http.StatusBadRequest, "cart is empty")
+		case errors.Is(err, errs.ErrInsufficientStock):
+			response.Error(c, http.StatusBadRequest, "insufficient stock")
 		default:
-			response.Error(c, http.StatusInternalServerError, "checkout failed", err.Error())
+			response.Error(c, http.StatusInternalServerError, "checkout failed")
 		}
 		return
 	}
@@ -45,23 +47,24 @@ func (h *Handler) Checkout(c *gin.Context) {
 
 func (h *Handler) ListMine(c *gin.Context) {
 	userID := c.GetString("user_id")
-	orders, err := h.service.ListMyOrders(c.Request.Context(), userID)
+	page := pagination.Parse(c)
+	orders, total, err := h.service.ListMyOrders(c.Request.Context(), userID, page.Limit, page.Offset)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "failed to fetch orders", err.Error())
+		response.Error(c, http.StatusInternalServerError, "failed to fetch orders")
 		return
 	}
-	response.Success(c, http.StatusOK, "ok", orders)
+	response.SuccessWithMeta(c, http.StatusOK, "ok", orders, pagination.BuildMeta(page.Page, page.Limit, total))
 }
 
 func (h *Handler) GetMine(c *gin.Context) {
 	userID := c.GetString("user_id")
 	order, err := h.service.GetMyOrder(c.Request.Context(), userID, c.Param("id"))
 	if err != nil {
-		if errors.Is(err, ErrOrderNotFound) {
-			response.Error(c, http.StatusNotFound, "order not found", err.Error())
+		if errors.Is(err, errs.ErrOrderNotFound) {
+			response.Error(c, http.StatusNotFound, "order not found")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "failed to fetch order", err.Error())
+		response.Error(c, http.StatusInternalServerError, "failed to fetch order")
 		return
 	}
 	response.Success(c, http.StatusOK, "ok", order)
@@ -70,21 +73,21 @@ func (h *Handler) GetMine(c *gin.Context) {
 func (h *Handler) UpdateStatus(c *gin.Context) {
 	var req UpdateStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
+		response.Error(c, http.StatusBadRequest, "invalid payload")
 		return
 	}
 	if err := validator.Validate.Struct(req); err != nil {
-		response.Error(c, http.StatusBadRequest, "validation failed", err.Error())
+		response.Error(c, http.StatusBadRequest, "validation failed")
 		return
 	}
 
 	order, err := h.service.UpdateStatus(c.Request.Context(), c.Param("id"), req.Status)
 	if err != nil {
-		if errors.Is(err, ErrOrderNotFound) {
-			response.Error(c, http.StatusNotFound, "order not found", err.Error())
+		if errors.Is(err, errs.ErrOrderNotFound) {
+			response.Error(c, http.StatusNotFound, "order not found")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "failed to update order status", err.Error())
+		response.Error(c, http.StatusInternalServerError, "failed to update order status")
 		return
 	}
 	response.Success(c, http.StatusOK, "order status updated", order)

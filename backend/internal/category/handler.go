@@ -3,6 +3,7 @@ package category
 import (
 	"net/http"
 
+	"stylemind/pkg/pagination"
 	"stylemind/pkg/response"
 	"stylemind/pkg/validator"
 
@@ -10,38 +11,39 @@ import (
 )
 
 type Handler struct {
-	repo *Repository
+	service *Service
 }
 
-func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, repo *Repository) {
-	h := &Handler{repo: repo}
+func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, service *Service) {
+	h := &Handler{service: service}
 	api.GET("/categories", h.List)
 	admin.POST("/categories", h.Create)
 }
 
 func (h *Handler) List(c *gin.Context) {
-	items, err := h.repo.List(c.Request.Context())
+	page := pagination.Parse(c)
+	items, total, err := h.service.List(c.Request.Context(), page.Limit, page.Offset)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "failed to fetch categories", err.Error())
+		response.Error(c, http.StatusInternalServerError, "failed to fetch categories")
 		return
 	}
-	response.Success(c, http.StatusOK, "ok", items)
+	response.SuccessWithMeta(c, http.StatusOK, "ok", items, pagination.BuildMeta(page.Page, page.Limit, total))
 }
 
 func (h *Handler) Create(c *gin.Context) {
 	var req CreateCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
+		response.Error(c, http.StatusBadRequest, "invalid payload")
 		return
 	}
 	if err := validator.Validate.Struct(req); err != nil {
-		response.Error(c, http.StatusBadRequest, "validation failed", err.Error())
+		response.Error(c, http.StatusBadRequest, "validation failed")
 		return
 	}
 
-	item, err := h.repo.Create(c.Request.Context(), req)
+	item, err := h.service.Create(c.Request.Context(), req)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, "failed to create category", err.Error())
+		response.Error(c, http.StatusBadRequest, "failed to create category")
 		return
 	}
 	response.Success(c, http.StatusCreated, "category created", item)

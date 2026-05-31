@@ -56,10 +56,12 @@ func main() {
 	admin.Use(jwtAuth, middleware.RequireRole("admin"))
 
 	categoryRepo := category.NewRepository(db)
-	category.RegisterRoutes(api, admin, categoryRepo)
+	categoryService := category.NewService(categoryRepo)
+	category.RegisterRoutes(api, admin, categoryService)
 
 	productRepo := product.NewRepository(db)
-	product.RegisterRoutes(api, admin, productRepo)
+	productService := product.NewService(productRepo)
+	product.RegisterRoutes(api, admin, productService)
 
 	cartRepo := cart.NewRepository(db)
 	cartService := cart.NewService(cartRepo)

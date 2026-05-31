@@ -3,7 +3,9 @@ package product
 import (
 	"errors"
 	"net/http"
+	"stylemind/internal/errs"
 
+	"stylemind/pkg/pagination"
 	"stylemind/pkg/response"
 	"stylemind/pkg/validator"
 
@@ -11,11 +13,11 @@ import (
 )
 
 type Handler struct {
-	repo *Repository
+	service *Service
 }
 
-func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, repo *Repository) {
-	h := &Handler{repo: repo}
+func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, service *Service) {
+	h := &Handler{service: service}
 
 	api.GET("/products", h.List)
 	api.GET("/products/:id", h.GetDetail)
@@ -26,27 +28,28 @@ func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, repo *Reposito
 }
 
 func (h *Handler) List(c *gin.Context) {
+	page := pagination.Parse(c)
 	filter := ListFilter{
 		Style:      c.Query("style"),
 		Color:      c.Query("color"),
 		CategoryID: c.Query("category_id"),
 	}
-	items, err := h.repo.List(c.Request.Context(), filter)
+	items, total, err := h.service.List(c.Request.Context(), filter, page.Limit, page.Offset)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "failed to fetch products", err.Error())
+		response.Error(c, http.StatusInternalServerError, "failed to fetch products")
 		return
 	}
-	response.Success(c, http.StatusOK, "ok", items)
+	response.SuccessWithMeta(c, http.StatusOK, "ok", items, pagination.BuildMeta(page.Page, page.Limit, total))
 }
 
 func (h *Handler) GetDetail(c *gin.Context) {
-	item, err := h.repo.GetByID(c.Request.Context(), c.Param("id"))
+	item, err := h.service.GetByID(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		if errors.Is(err, ErrProductNotFound) {
-			response.Error(c, http.StatusNotFound, "product not found", err.Error())
+		if errors.Is(err, errs.ErrProductNotFound) {
+			response.Error(c, http.StatusNotFound, "product not found")
 			return
 		}
-		response.Error(c, http.StatusInternalServerError, "failed to fetch product", err.Error())
+		response.Error(c, http.StatusInternalServerError, "failed to fetch product")
 		return
 	}
 	response.Success(c, http.StatusOK, "ok", item)
@@ -55,17 +58,17 @@ func (h *Handler) GetDetail(c *gin.Context) {
 func (h *Handler) Create(c *gin.Context) {
 	var req CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
+		response.Error(c, http.StatusBadRequest, "invalid payload")
 		return
 	}
 	if err := validator.Validate.Struct(req); err != nil {
-		response.Error(c, http.StatusBadRequest, "validation failed", err.Error())
+		response.Error(c, http.StatusBadRequest, "validation failed")
 		return
 	}
 
-	item, err := h.repo.Create(c.Request.Context(), req)
+	item, err := h.service.Create(c.Request.Context(), req)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, "failed to create product", err.Error())
+		response.Error(c, http.StatusBadRequest, "failed to create product")
 		return
 	}
 	response.Success(c, http.StatusCreated, "product created", item)
@@ -74,34 +77,34 @@ func (h *Handler) Create(c *gin.Context) {
 func (h *Handler) Update(c *gin.Context) {
 	var req UpdateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, http.StatusBadRequest, "invalid payload", err.Error())
+		response.Error(c, http.StatusBadRequest, "invalid payload")
 		return
 	}
 	if err := validator.Validate.Struct(req); err != nil {
-		response.Error(c, http.StatusBadRequest, "validation failed", err.Error())
+		response.Error(c, http.StatusBadRequest, "validation failed")
 		return
 	}
 
-	item, err := h.repo.Update(c.Request.Context(), c.Param("id"), req)
+	item, err := h.service.Update(c.Request.Context(), c.Param("id"), req)
 	if err != nil {
-		if errors.Is(err, ErrProductNotFound) {
-			response.Error(c, http.StatusNotFound, "product not found", err.Error())
+		if errors.Is(err, errs.ErrProductNotFound) {
+			response.Error(c, http.StatusNotFound, "product not found")
 			return
 		}
-		response.Error(c, http.StatusBadRequest, "failed to update product", err.Error())
+		response.Error(c, http.StatusBadRequest, "failed to update product")
 		return
 	}
 	response.Success(c, http.StatusOK, "product updated", item)
 }
 
 func (h *Handler) Delete(c *gin.Context) {
-	err := h.repo.Delete(c.Request.Context(), c.Param("id"))
+	err := h.service.Delete(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		if errors.Is(err, ErrProductNotFound) {
-			response.Error(c, http.StatusNotFound, "product not found", err.Error())
+		if errors.Is(err, errs.ErrProductNotFound) {
+			response.Error(c, http.StatusNotFound, "product not found")
 			return
 		}
-		response.Error(c, http.StatusBadRequest, "failed to delete product", err.Error())
+		response.Error(c, http.StatusBadRequest, "failed to delete product")
 		return
 	}
 	response.Success(c, http.StatusOK, "product deleted", gin.H{"id": c.Param("id")})
