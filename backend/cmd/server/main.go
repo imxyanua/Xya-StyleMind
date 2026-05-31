@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"stylemind/internal/auth"
+	"stylemind/internal/cart"
 	"stylemind/internal/category"
 	"stylemind/internal/config"
 	"stylemind/internal/database"
@@ -58,6 +59,10 @@ func main() {
 
 	productRepo := product.NewRepository(db)
 	product.RegisterRoutes(api, admin, productRepo)
+
+	cartRepo := cart.NewRepository(db)
+	cartService := cart.NewService(cartRepo)
+	cart.RegisterRoutes(api, jwtAuth, cartService)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
