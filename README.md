@@ -84,18 +84,32 @@ cd backend
 go run ./cmd/server
 ```
 
-3. Build backend:
+3. Seed development data (idempotent, non-destructive):
+
+```bash
+cd backend
+go run ./cmd/seed
+```
+
+4. Build backend:
 
 ```bash
 cd backend
 go build ./...
 ```
 
-4. Health check:
+5. Health check:
 
 ```bash
 curl http://localhost:8080/api/v1/health
 ```
+
+### Seed Data Notes
+
+- Development seed inserts 6 categories and 36 products.
+- Product data includes diverse styles/colors, varied stock, and VND pricing.
+- Seed is idempotent via deterministic IDs and upsert logic, so running multiple times will not duplicate records.
+- Seed does not reset or delete existing database data.
 
 ### Security & Secrets
 
