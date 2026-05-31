@@ -17,6 +17,7 @@ import (
 	"stylemind/internal/database"
 	"stylemind/internal/health"
 	"stylemind/internal/middleware"
+	"stylemind/internal/order"
 	"stylemind/internal/product"
 
 	"github.com/gin-contrib/cors"
@@ -63,6 +64,10 @@ func main() {
 	cartRepo := cart.NewRepository(db)
 	cartService := cart.NewService(cartRepo)
 	cart.RegisterRoutes(api, jwtAuth, cartService)
+
+	orderRepo := order.NewRepository(db)
+	orderService := order.NewService(orderRepo)
+	order.RegisterRoutes(api, admin, jwtAuth, orderService)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

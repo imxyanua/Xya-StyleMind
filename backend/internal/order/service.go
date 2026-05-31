@@ -1,0 +1,45 @@
+package order
+
+import "context"
+
+type Service struct {
+	repo *Repository
+}
+
+func NewService(repo *Repository) *Service {
+	return &Service{repo: repo}
+}
+
+func (s *Service) Checkout(ctx context.Context, userID string) (*OrderResponse, error) {
+	cartID, err := s.repo.GetOrCreateCart(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := s.repo.GetCheckoutItems(ctx, cartID)
+	if err != nil {
+		return nil, err
+	}
+
+	orderID, err := s.repo.CreateOrderFromCart(ctx, userID, cartID, items)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repo.GetOrderByIDForUser(ctx, orderID, userID)
+}
+
+func (s *Service) ListMyOrders(ctx context.Context, userID string) ([]OrderResponse, error) {
+	return s.repo.ListOrdersByUser(ctx, userID)
+}
+
+func (s *Service) GetMyOrder(ctx context.Context, userID, orderID string) (*OrderResponse, error) {
+	return s.repo.GetOrderByIDForUser(ctx, orderID, userID)
+}
+
+func (s *Service) UpdateStatus(ctx context.Context, orderID, status string) (*OrderResponse, error) {
+	if err := s.repo.UpdateOrderStatus(ctx, orderID, status); err != nil {
+		return nil, err
+	}
+	return s.repo.GetOrderByID(ctx, orderID)
+}
