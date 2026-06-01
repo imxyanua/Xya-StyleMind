@@ -25,6 +25,12 @@ export default function RootLayout({
               <Link href="/products" className="hover:underline">
                 Products
               </Link>
+              <Link href="/cart" className="hover:underline">
+                Cart
+              </Link>
+              <Link href="/orders" className="hover:underline">
+                Orders
+              </Link>
               <Link href="/login" className="hover:underline">
                 Login
               </Link>

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { login } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,7 +23,8 @@ export default function LoginPage() {
 
     try {
       await login({ email, password });
-      router.push("/products");
+      const redirect = searchParams.get("redirect") || "/products";
+      router.push(redirect);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed";
       setError(message);

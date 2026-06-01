@@ -32,6 +32,10 @@ export function getToken(): string | null {
   return window.localStorage.getItem(TOKEN_KEY);
 }
 
+export function isLoggedIn() {
+  return Boolean(getToken());
+}
+
 export function setToken(token: string) {
   if (typeof window === "undefined") {
     return;

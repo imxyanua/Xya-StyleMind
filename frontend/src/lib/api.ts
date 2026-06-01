@@ -1,4 +1,6 @@
 import { ApiError, type ApiResponse } from "@/types/api";
+import type { Cart } from "@/types/cart";
+import type { Order } from "@/types/order";
 import type { Product } from "@/types/product";
 
 const API_BASE_URL =
@@ -85,4 +87,50 @@ export async function fetchProducts(params: ProductListParams = {}) {
 
 export async function fetchProductById(id: string) {
   return apiRequest<Product>(`/products/${id}`, { method: "GET" }, { auth: false });
+}
+
+export async function addToCart(productId: string, quantity: number) {
+  return apiRequest<Cart>("/cart/items", {
+    method: "POST",
+    body: JSON.stringify({
+      product_id: productId,
+      quantity,
+    }),
+  });
+}
+
+export async function fetchCart() {
+  return apiRequest<Cart>("/cart", { method: "GET" });
+}
+
+export async function updateCartItem(itemId: string, quantity: number) {
+  return apiRequest<Cart>(`/cart/items/${itemId}`, {
+    method: "PUT",
+    body: JSON.stringify({ quantity }),
+  });
+}
+
+export async function removeCartItem(itemId: string) {
+  return apiRequest<Cart>(`/cart/items/${itemId}`, { method: "DELETE" });
+}
+
+export async function checkoutOrder() {
+  return apiRequest<Order>("/orders", { method: "POST" });
+}
+
+type OrderListParams = {
+  page?: number;
+  limit?: number;
+};
+
+export async function fetchMyOrders(params: OrderListParams = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.page) {
+    searchParams.set("page", String(params.page));
+  }
+  if (params.limit) {
+    searchParams.set("limit", String(params.limit));
+  }
+  const query = searchParams.toString();
+  return apiRequest<Order[]>(`/orders${query ? `?${query}` : ""}`, { method: "GET" });
 }
