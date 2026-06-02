@@ -60,6 +60,10 @@ func (h *Handler) GetMine(c *gin.Context) {
 	userID := c.GetString("user_id")
 	order, err := h.service.GetMyOrder(c.Request.Context(), userID, c.Param("id"))
 	if err != nil {
+		if errors.Is(err, errs.ErrInvalidID) {
+			response.Error(c, http.StatusBadRequest, "invalid order id")
+			return
+		}
 		if errors.Is(err, errs.ErrOrderNotFound) {
 			response.Error(c, http.StatusNotFound, "order not found")
 			return
@@ -83,6 +87,10 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 
 	order, err := h.service.UpdateStatus(c.Request.Context(), c.Param("id"), req.Status)
 	if err != nil {
+		if errors.Is(err, errs.ErrInvalidID) {
+			response.Error(c, http.StatusBadRequest, "invalid order id")
+			return
+		}
 		if errors.Is(err, errs.ErrOrderNotFound) {
 			response.Error(c, http.StatusNotFound, "order not found")
 			return

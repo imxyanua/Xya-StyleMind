@@ -51,6 +51,8 @@ func (h *Handler) AddItem(c *gin.Context) {
 	result, err := h.service.AddItem(c.Request.Context(), userID, req)
 	if err != nil {
 		switch {
+		case errors.Is(err, errs.ErrInvalidID):
+			response.Error(c, http.StatusBadRequest, "invalid product id")
 		case errors.Is(err, errs.ErrInvalidQuantity):
 			response.Error(c, http.StatusBadRequest, "quantity must be greater than 0")
 		case errors.Is(err, errs.ErrProductNotFound):
@@ -80,6 +82,8 @@ func (h *Handler) UpdateItem(c *gin.Context) {
 	result, err := h.service.UpdateItem(c.Request.Context(), userID, c.Param("id"), req.Quantity)
 	if err != nil {
 		switch {
+		case errors.Is(err, errs.ErrInvalidID):
+			response.Error(c, http.StatusBadRequest, "invalid cart item id")
 		case errors.Is(err, errs.ErrInvalidQuantity):
 			response.Error(c, http.StatusBadRequest, "quantity must be greater than 0")
 		case errors.Is(err, errs.ErrCartItemNotFound):
@@ -98,6 +102,10 @@ func (h *Handler) DeleteItem(c *gin.Context) {
 	userID := c.GetString("user_id")
 	result, err := h.service.DeleteItem(c.Request.Context(), userID, c.Param("id"))
 	if err != nil {
+		if errors.Is(err, errs.ErrInvalidID) {
+			response.Error(c, http.StatusBadRequest, "invalid cart item id")
+			return
+		}
 		if errors.Is(err, errs.ErrCartItemNotFound) {
 			response.Error(c, http.StatusNotFound, "cart item not found")
 			return

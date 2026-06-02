@@ -1,7 +1,7 @@
 package cart
 
 type AddCartItemRequest struct {
-	ProductID string `json:"product_id" validate:"required"`
+	ProductID string `json:"product_id" validate:"required,uuid"`
 	Quantity  int    `json:"quantity" validate:"required,gt=0"`
 }
 

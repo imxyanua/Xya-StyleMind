@@ -41,8 +41,11 @@ func main() {
 	}
 
 	router := gin.New()
+	if err := router.SetTrustedProxies(nil); err != nil {
+		log.Fatalf("failed to configure trusted proxies: %v", err)
+	}
 	router.Use(gin.Logger(), gin.Recovery())
-	router.Use(cors.New(middleware.CORSConfig()))
+	router.Use(cors.New(middleware.CORSConfig(cfg.CORSAllowedOrigins)))
 
 	api := router.Group("/api/v1")
 	health.RegisterRoutes(api, db)
@@ -50,7 +53,7 @@ func main() {
 	authRepo := auth.NewRepository(db)
 	authService := auth.NewService(authRepo, cfg.JWTSecret)
 	jwtAuth := middleware.JWTAuth(cfg.JWTSecret)
-	auth.RegisterRoutes(api, authService, jwtAuth)
+	auth.RegisterRoutes(api, authService, jwtAuth, middleware.RateLimit(10, time.Minute))
 
 	admin := api.Group("/admin")
 	admin.Use(jwtAuth, middleware.RequireRole("admin"))

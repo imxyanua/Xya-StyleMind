@@ -12,7 +12,20 @@ import (
 )
 
 func RunMigrations(ctx context.Context, db *pgxpool.Pool, migrationsDir string) error {
-	if err := ensureMigrationsTable(ctx, db); err != nil {
+	conn, err := db.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire migration connection: %w", err)
+	}
+	defer conn.Release()
+
+	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1)", int64(770017001)); err != nil {
+		return fmt.Errorf("acquire migration lock: %w", err)
+	}
+	defer func() {
+		_, _ = conn.Exec(context.Background(), "SELECT pg_advisory_unlock($1)", int64(770017001))
+	}()
+
+	if err := ensureMigrationsTable(ctx, conn); err != nil {
 		return err
 	}
 
@@ -31,7 +44,7 @@ func RunMigrations(ctx context.Context, db *pgxpool.Pool, migrationsDir string) 
 	sort.Strings(files)
 
 	for _, file := range files {
-		applied, err := isMigrationApplied(ctx, db, file)
+		applied, err := isMigrationApplied(ctx, conn, file)
 		if err != nil {
 			return err
 		}
@@ -45,7 +58,7 @@ func RunMigrations(ctx context.Context, db *pgxpool.Pool, migrationsDir string) 
 			return fmt.Errorf("read migration %s: %w", file, err)
 		}
 
-		tx, err := db.Begin(ctx)
+		tx, err := conn.Begin(ctx)
 		if err != nil {
 			return fmt.Errorf("begin migration tx %s: %w", file, err)
 		}
@@ -68,7 +81,7 @@ func RunMigrations(ctx context.Context, db *pgxpool.Pool, migrationsDir string) 
 	return nil
 }
 
-func ensureMigrationsTable(ctx context.Context, db *pgxpool.Pool) error {
+func ensureMigrationsTable(ctx context.Context, db *pgxpool.Conn) error {
 	query := `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			version TEXT PRIMARY KEY,
@@ -82,7 +95,7 @@ func ensureMigrationsTable(ctx context.Context, db *pgxpool.Pool) error {
 	return nil
 }
 
-func isMigrationApplied(ctx context.Context, db *pgxpool.Pool, version string) (bool, error) {
+func isMigrationApplied(ctx context.Context, db *pgxpool.Conn, version string) (bool, error) {
 	var exists bool
 	err := db.QueryRow(
 		ctx,

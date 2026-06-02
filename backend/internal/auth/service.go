@@ -20,7 +20,8 @@ func NewService(repo *Repository, jwtSecret string) *Service {
 }
 
 func (s *Service) Register(ctx context.Context, req RegisterRequest) (map[string]interface{}, error) {
-	_, err := s.repo.GetUserByEmail(ctx, req.Email)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	_, err := s.repo.GetUserByEmail(ctx, email)
 	if err == nil {
 		return nil, errs.ErrEmailAlreadyExists
 	}
@@ -35,7 +36,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (map[string
 
 	user := &User{
 		ID:           uuid.NewString(),
-		Email:        strings.ToLower(strings.TrimSpace(req.Email)),
+		Email:        email,
 		FullName:     strings.TrimSpace(req.FullName),
 		PasswordHash: string(hash),
 		Role:         "user",
@@ -61,7 +62,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (map[string
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest) (map[string]interface{}, error) {
-	user, err := s.repo.GetUserByEmail(ctx, req.Email)
+	user, err := s.repo.GetUserByEmail(ctx, strings.ToLower(strings.TrimSpace(req.Email)))
 	if err != nil {
 		if errors.Is(err, errs.ErrUserNotFound) {
 			return nil, errs.ErrInvalidCredentials

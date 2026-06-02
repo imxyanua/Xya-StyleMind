@@ -21,24 +21,12 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 func (r *Repository) GetOrCreateCart(ctx context.Context, userID string) (*Cart, error) {
 	cart := &Cart{}
 	err := r.db.QueryRow(ctx, `
-		SELECT id, user_id, created_at, updated_at
-		FROM carts
-		WHERE user_id = $1
-	`, userID).Scan(&cart.ID, &cart.UserID, &cart.CreatedAt, &cart.UpdatedAt)
-	if err == nil {
-		return cart, nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return nil, err
-	}
-
-	cart.ID = uuid.NewString()
-	cart.UserID = userID
-	err = r.db.QueryRow(ctx, `
 		INSERT INTO carts (id, user_id)
 		VALUES ($1, $2)
-		RETURNING created_at, updated_at
-	`, cart.ID, cart.UserID).Scan(&cart.CreatedAt, &cart.UpdatedAt)
+		ON CONFLICT (user_id)
+		DO UPDATE SET updated_at = carts.updated_at
+		RETURNING id, user_id, created_at, updated_at
+	`, uuid.NewString(), userID).Scan(&cart.ID, &cart.UserID, &cart.CreatedAt, &cart.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -61,28 +49,34 @@ func (r *Repository) GetProductSnapshot(ctx context.Context, productID string) (
 	return p, nil
 }
 
-func (r *Repository) GetCartItemByProduct(ctx context.Context, cartID, productID string) (*CartItemRecord, error) {
-	item := &CartItemRecord{}
+func (r *Repository) AddOrIncrementCartItem(ctx context.Context, cartID, productID string, quantity int) error {
+	var id string
 	err := r.db.QueryRow(ctx, `
-		SELECT id, cart_id, product_id, quantity, created_at, updated_at
-		FROM cart_items
-		WHERE cart_id = $1 AND product_id = $2
-	`, cartID, productID).Scan(&item.ID, &item.CartID, &item.ProductID, &item.Quantity, &item.CreatedAt, &item.UpdatedAt)
+		INSERT INTO cart_items (id, cart_id, product_id, quantity)
+		SELECT $1, $2, $3, $4
+		WHERE EXISTS (
+			SELECT 1
+			FROM products
+			WHERE id = $3 AND stock >= $4
+		)
+		ON CONFLICT (cart_id, product_id)
+		DO UPDATE
+		SET quantity = cart_items.quantity + EXCLUDED.quantity,
+		    updated_at = NOW()
+		WHERE cart_items.quantity + EXCLUDED.quantity <= (
+			SELECT stock
+			FROM products
+			WHERE id = cart_items.product_id
+		)
+		RETURNING id
+	`, uuid.NewString(), cartID, productID, quantity).Scan(&id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errs.ErrCartItemNotFound
+			return errs.ErrInsufficientStock
 		}
-		return nil, err
+		return err
 	}
-	return item, nil
-}
-
-func (r *Repository) CreateCartItem(ctx context.Context, cartID, productID string, quantity int) error {
-	_, err := r.db.Exec(ctx, `
-		INSERT INTO cart_items (id, cart_id, product_id, quantity)
-		VALUES ($1, $2, $3, $4)
-	`, uuid.NewString(), cartID, productID, quantity)
-	return err
+	return nil
 }
 
 func (r *Repository) UpdateCartItemQuantity(ctx context.Context, itemID string, quantity int) error {

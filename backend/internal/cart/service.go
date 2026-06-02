@@ -2,8 +2,9 @@ package cart
 
 import (
 	"context"
-	"errors"
 	"stylemind/internal/errs"
+
+	"github.com/google/uuid"
 )
 
 type Service struct {
@@ -26,6 +27,9 @@ func (s *Service) AddItem(ctx context.Context, userID string, req AddCartItemReq
 	if req.Quantity <= 0 {
 		return nil, errs.ErrInvalidQuantity
 	}
+	if _, err := uuid.Parse(req.ProductID); err != nil {
+		return nil, errs.ErrInvalidID
+	}
 
 	product, err := s.repo.GetProductSnapshot(ctx, req.ProductID)
 	if err != nil {
@@ -37,26 +41,11 @@ func (s *Service) AddItem(ctx context.Context, userID string, req AddCartItemReq
 		return nil, err
 	}
 
-	existing, err := s.repo.GetCartItemByProduct(ctx, cart.ID, req.ProductID)
-	if err != nil && !errors.Is(err, errs.ErrCartItemNotFound) {
-		return nil, err
+	if req.Quantity > product.Stock {
+		return nil, errs.ErrInsufficientStock
 	}
-
-	if errors.Is(err, errs.ErrCartItemNotFound) {
-		if req.Quantity > product.Stock {
-			return nil, errs.ErrInsufficientStock
-		}
-		if err := s.repo.CreateCartItem(ctx, cart.ID, req.ProductID, req.Quantity); err != nil {
-			return nil, err
-		}
-	} else {
-		nextQty := existing.Quantity + req.Quantity
-		if nextQty > product.Stock {
-			return nil, errs.ErrInsufficientStock
-		}
-		if err := s.repo.UpdateCartItemQuantity(ctx, existing.ID, nextQty); err != nil {
-			return nil, err
-		}
+	if err := s.repo.AddOrIncrementCartItem(ctx, cart.ID, req.ProductID, req.Quantity); err != nil {
+		return nil, err
 	}
 
 	return s.buildCartResponse(ctx, cart)
@@ -65,6 +54,9 @@ func (s *Service) AddItem(ctx context.Context, userID string, req AddCartItemReq
 func (s *Service) UpdateItem(ctx context.Context, userID, itemID string, quantity int) (*CartResponse, error) {
 	if quantity <= 0 {
 		return nil, errs.ErrInvalidQuantity
+	}
+	if _, err := uuid.Parse(itemID); err != nil {
+		return nil, errs.ErrInvalidID
 	}
 
 	cart, err := s.repo.GetOrCreateCart(ctx, userID)
@@ -87,6 +79,10 @@ func (s *Service) UpdateItem(ctx context.Context, userID, itemID string, quantit
 }
 
 func (s *Service) DeleteItem(ctx context.Context, userID, itemID string) (*CartResponse, error) {
+	if _, err := uuid.Parse(itemID); err != nil {
+		return nil, errs.ErrInvalidID
+	}
+
 	cart, err := s.repo.GetOrCreateCart(ctx, userID)
 	if err != nil {
 		return nil, err

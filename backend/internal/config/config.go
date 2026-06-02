@@ -3,14 +3,17 @@ package config
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	Port      string
-	JWTSecret string
-	Database  DatabaseConfig
+	AppEnv             string
+	Port               string
+	JWTSecret          string
+	CORSAllowedOrigins []string
+	Database           DatabaseConfig
 }
 
 type DatabaseConfig struct {
@@ -26,9 +29,12 @@ func Load() Config {
 		log.Printf("warning: .env not found, using environment variables")
 	}
 
+	appEnv := getEnv("APP_ENV", "development")
 	cfg := Config{
-		Port:      getEnv("PORT", "8080"),
-		JWTSecret: getEnv("JWT_SECRET", "change-me-in-production"),
+		AppEnv:             appEnv,
+		Port:               getEnv("PORT", "8080"),
+		JWTSecret:          getEnv("JWT_SECRET", "change-me-in-production"),
+		CORSAllowedOrigins: getEnvList("CORS_ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnv("DB_PORT", "5432"),
@@ -38,6 +44,7 @@ func Load() Config {
 		},
 	}
 
+	cfg.validate()
 	return cfg
 }
 
@@ -47,4 +54,39 @@ func getEnv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func getEnvList(key string, fallback []string) []string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		item := strings.TrimSpace(part)
+		if item != "" {
+			items = append(items, item)
+		}
+	}
+	if len(items) == 0 {
+		return fallback
+	}
+	return items
+}
+
+func (c Config) validate() {
+	if !strings.EqualFold(c.AppEnv, "production") {
+		return
+	}
+
+	if c.JWTSecret == "" || c.JWTSecret == "change-me-in-production" || c.JWTSecret == "change_me_in_production" {
+		log.Fatal("JWT_SECRET must be configured in production")
+	}
+	for _, origin := range c.CORSAllowedOrigins {
+		if origin == "*" {
+			log.Fatal("CORS_ALLOWED_ORIGINS cannot contain * in production")
+		}
+	}
 }

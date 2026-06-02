@@ -36,6 +36,10 @@ func (h *Handler) List(c *gin.Context) {
 	}
 	items, total, err := h.service.List(c.Request.Context(), filter, page.Limit, page.Offset)
 	if err != nil {
+		if errors.Is(err, errs.ErrInvalidID) {
+			response.Error(c, http.StatusBadRequest, "invalid category_id")
+			return
+		}
 		response.Error(c, http.StatusInternalServerError, "failed to fetch products")
 		return
 	}
@@ -45,6 +49,10 @@ func (h *Handler) List(c *gin.Context) {
 func (h *Handler) GetDetail(c *gin.Context) {
 	item, err := h.service.GetByID(c.Request.Context(), c.Param("id"))
 	if err != nil {
+		if errors.Is(err, errs.ErrInvalidID) {
+			response.Error(c, http.StatusBadRequest, "invalid product id")
+			return
+		}
 		if errors.Is(err, errs.ErrProductNotFound) {
 			response.Error(c, http.StatusNotFound, "product not found")
 			return
@@ -68,6 +76,10 @@ func (h *Handler) Create(c *gin.Context) {
 
 	item, err := h.service.Create(c.Request.Context(), req)
 	if err != nil {
+		if errors.Is(err, errs.ErrInvalidID) {
+			response.Error(c, http.StatusBadRequest, "invalid category_id")
+			return
+		}
 		response.Error(c, http.StatusBadRequest, "failed to create product")
 		return
 	}
@@ -87,6 +99,10 @@ func (h *Handler) Update(c *gin.Context) {
 
 	item, err := h.service.Update(c.Request.Context(), c.Param("id"), req)
 	if err != nil {
+		if errors.Is(err, errs.ErrInvalidID) {
+			response.Error(c, http.StatusBadRequest, "invalid product or category id")
+			return
+		}
 		if errors.Is(err, errs.ErrProductNotFound) {
 			response.Error(c, http.StatusNotFound, "product not found")
 			return
@@ -100,6 +116,10 @@ func (h *Handler) Update(c *gin.Context) {
 func (h *Handler) Delete(c *gin.Context) {
 	err := h.service.Delete(c.Request.Context(), c.Param("id"))
 	if err != nil {
+		if errors.Is(err, errs.ErrInvalidID) {
+			response.Error(c, http.StatusBadRequest, "invalid product id")
+			return
+		}
 		if errors.Is(err, errs.ErrProductNotFound) {
 			response.Error(c, http.StatusNotFound, "product not found")
 			return

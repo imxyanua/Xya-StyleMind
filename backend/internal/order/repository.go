@@ -20,32 +20,36 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 
 func (r *Repository) GetOrCreateCart(ctx context.Context, userID string) (string, error) {
 	var cartID string
-	err := r.db.QueryRow(ctx, `SELECT id FROM carts WHERE user_id = $1`, userID).Scan(&cartID)
-	if err == nil {
-		return cartID, nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return "", err
-	}
-
-	cartID = uuid.NewString()
-	_, err = r.db.Exec(ctx, `INSERT INTO carts (id, user_id) VALUES ($1, $2)`, cartID, userID)
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO carts (id, user_id)
+		VALUES ($1, $2)
+		ON CONFLICT (user_id)
+		DO UPDATE SET updated_at = carts.updated_at
+		RETURNING id
+	`, uuid.NewString(), userID).Scan(&cartID)
 	if err != nil {
 		return "", err
 	}
 	return cartID, nil
 }
 
-func (r *Repository) GetCheckoutItems(ctx context.Context, cartID string) ([]CheckoutItem, error) {
-	rows, err := r.db.Query(ctx, `
+func (r *Repository) CreateOrderFromCart(ctx context.Context, userID, cartID string) (string, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	rows, err := tx.Query(ctx, `
 		SELECT ci.id, ci.product_id, p.name, p.image_url, p.style, p.color, p.price, p.stock, ci.quantity
 		FROM cart_items ci
 		JOIN products p ON p.id = ci.product_id
 		WHERE ci.cart_id = $1
 		ORDER BY ci.created_at DESC
+		FOR UPDATE OF ci, p
 	`, cartID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer rows.Close()
 
@@ -56,25 +60,16 @@ func (r *Repository) GetCheckoutItems(ctx context.Context, cartID string) ([]Che
 			&item.CartItemID, &item.ProductID, &item.Name, &item.ImageURL, &item.Style, &item.Color,
 			&item.Price, &item.Stock, &item.Quantity,
 		); err != nil {
-			return nil, err
+			return "", err
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	if len(items) == 0 {
-		return nil, errs.ErrCartEmpty
-	}
-	return items, nil
-}
-
-func (r *Repository) CreateOrderFromCart(ctx context.Context, userID, cartID string, items []CheckoutItem) (string, error) {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
 		return "", err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	if len(items) == 0 {
+		return "", errs.ErrCartEmpty
+	}
 
 	total := 0.0
 	for _, item := range items {
