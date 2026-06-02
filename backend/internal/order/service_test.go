@@ -20,6 +20,7 @@ type fakeOrderRepository struct {
 	listOrdersErr          error
 	listAllOrdersErr       error
 	updateStatusErr        error
+	currentStatus          string
 	lastUserID             string
 	lastCartID             string
 	lastOrderID            string
@@ -98,7 +99,14 @@ func (r *fakeOrderRepository) GetOrderByID(_ context.Context, orderID string) (*
 	if r.getOrderErr != nil {
 		return nil, r.getOrderErr
 	}
-	return &OrderResponse{ID: orderID, Status: r.lastStatus, Items: []OrderItem{}}, nil
+	status := r.lastStatus
+	if status == "" {
+		status = r.currentStatus
+	}
+	if status == "" {
+		status = StatusPending
+	}
+	return &OrderResponse{ID: orderID, Status: status, Items: []OrderItem{}}, nil
 }
 
 func TestServiceCheckout_Success(t *testing.T) {

@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"stylemind/internal/auth"
 	"stylemind/internal/errs"
 	"stylemind/internal/middleware"
+	"stylemind/pkg/logger"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -20,6 +22,10 @@ import (
 func newOrderTestRouter(repo *fakeOrderRepository) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("request_id", "req-order-audit-1")
+		c.Next()
+	})
 	api := router.Group("/api/v1")
 	admin := api.Group("/admin")
 	authMiddleware := func(c *gin.Context) {
@@ -34,6 +40,10 @@ func newOrderTestRouter(repo *fakeOrderRepository) *gin.Engine {
 func newProtectedOrderTestRouter(repo *fakeOrderRepository, secret string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("request_id", "req-order-audit-1")
+		c.Next()
+	})
 	api := router.Group("/api/v1")
 	admin := api.Group("/admin")
 	tokenConfig := orderTestTokenConfig()
@@ -302,7 +312,11 @@ func TestProtectedAdminOrderDetail_InvalidID(t *testing.T) {
 }
 
 func TestProtectedAdminOrderStatus_AdminAllowed(t *testing.T) {
-	repo := &fakeOrderRepository{}
+	var audit bytes.Buffer
+	restore := logger.SetAuditOutput(&audit)
+	defer restore()
+
+	repo := &fakeOrderRepository{currentStatus: StatusPending}
 	router := newProtectedOrderTestRouter(repo, "test-secret")
 
 	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
@@ -323,6 +337,52 @@ func TestProtectedAdminOrderStatus_AdminAllowed(t *testing.T) {
 	if repo.lastOrderID != orderID || repo.lastStatus != StatusPaid {
 		t.Fatalf("repo update = order:%s status:%s, want %s/%s", repo.lastOrderID, repo.lastStatus, orderID, StatusPaid)
 	}
+	assertOrderAuditEvent(t, audit.String(), map[string]any{
+		"type":       "audit",
+		"event":      "admin.order_status.update",
+		"result":     "success",
+		"user_id":    "admin-1",
+		"role":       "admin",
+		"order_id":   orderID,
+		"old_status": StatusPending,
+		"new_status": StatusPaid,
+		"request_id": "req-order-audit-1",
+	})
+	assertOrderAuditDoesNotContain(t, audit.String(), token, "Authorization", "Bearer")
+}
+
+func TestProtectedAdminOrderStatusFailed_WritesSafeAuditReason(t *testing.T) {
+	var audit bytes.Buffer
+	restore := logger.SetAuditOutput(&audit)
+	defer restore()
+
+	repo := &fakeOrderRepository{currentStatus: StatusCompleted, updateStatusErr: errs.ErrInvalidOrderStatusTransition}
+	router := newProtectedOrderTestRouter(repo, "test-secret")
+
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	orderID := uuid.NewString()
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/orders/"+orderID+"/status", bytes.NewBufferString(`{"status":"paid"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusBadRequest, "invalid order status transition")
+	assertOrderAuditEvent(t, audit.String(), map[string]any{
+		"event":      "admin.order_status.update",
+		"result":     "failed",
+		"user_id":    "admin-1",
+		"role":       "admin",
+		"order_id":   orderID,
+		"old_status": StatusCompleted,
+		"new_status": StatusPaid,
+		"reason":     "invalid_status_transition",
+	})
+	assertOrderAuditDoesNotContain(t, audit.String(), token, "Authorization", "Bearer")
 }
 
 func assertOrderErrorResponse(t *testing.T, w *httptest.ResponseRecorder, status int, message string) {
@@ -344,6 +404,35 @@ func assertOrderErrorResponse(t *testing.T, w *httptest.ResponseRecorder, status
 	}
 	if _, ok := body["data"]; ok {
 		t.Fatal("error response should not include data")
+	}
+}
+
+func assertOrderAuditEvent(t *testing.T, raw string, expected map[string]any) {
+	t.Helper()
+
+	entries := strings.Split(strings.TrimSpace(raw), "\n")
+	if len(entries) == 0 || entries[0] == "" {
+		t.Fatal("expected audit log entry, got empty output")
+	}
+
+	var entry map[string]any
+	if err := json.Unmarshal([]byte(entries[len(entries)-1]), &entry); err != nil {
+		t.Fatalf("audit json unmarshal error = %v, raw=%s", err, raw)
+	}
+	for key, want := range expected {
+		if got := entry[key]; got != want {
+			t.Fatalf("audit[%s] = %v, want %v; entry=%+v", key, got, want, entry)
+		}
+	}
+}
+
+func assertOrderAuditDoesNotContain(t *testing.T, raw string, forbidden ...string) {
+	t.Helper()
+
+	for _, value := range forbidden {
+		if strings.Contains(raw, value) {
+			t.Fatalf("audit output contained forbidden value %q: %s", value, raw)
+		}
 	}
 }
 

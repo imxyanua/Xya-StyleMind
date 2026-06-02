@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"stylemind/pkg/logger"
 	"testing"
 	"time"
 
@@ -77,6 +78,103 @@ func TestHandlerLogin_InvalidCredentialsDoesNotLeakDetails(t *testing.T) {
 	if bytes.Contains(w.Body.Bytes(), []byte("bcrypt")) {
 		t.Fatal("response leaked internal bcrypt details")
 	}
+}
+
+func TestHandlerLoginSuccess_WritesAuditEvent(t *testing.T) {
+	var audit bytes.Buffer
+	restore := logger.SetAuditOutput(&audit)
+	defer restore()
+
+	repo := newFakeUserRepository()
+	hash, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("GenerateFromPassword error = %v", err)
+	}
+	repo.usersByEmail["user@example.com"] = &User{
+		ID:           "user-1",
+		Email:        "user@example.com",
+		PasswordHash: string(hash),
+		Role:         "user",
+	}
+	router := newAuthAuditTestRouter(NewService(repo, testTokenConfig()))
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewBufferString(`{
+		"email":"USER@example.com",
+		"password":"password123"
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "audit-test")
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+	assertAuditEvent(t, audit.String(), map[string]any{
+		"type":       "audit",
+		"event":      "auth.login",
+		"result":     "success",
+		"user_id":    "user-1",
+		"role":       "user",
+		"email":      "user@example.com",
+		"request_id": "req-audit-1",
+		"user_agent": "audit-test",
+	})
+	assertAuditDoesNotContain(t, audit.String(), "password123", "Authorization", "Bearer", "token")
+}
+
+func TestHandlerLoginFailed_WritesAuditEventWithoutPassword(t *testing.T) {
+	var audit bytes.Buffer
+	restore := logger.SetAuditOutput(&audit)
+	defer restore()
+
+	router := newAuthAuditTestRouter(NewService(newFakeUserRepository(), testTokenConfig()))
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewBufferString(`{
+		"email":"missing@example.com",
+		"password":"password123"
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer should-not-log")
+	router.ServeHTTP(w, req)
+
+	assertErrorResponse(t, w, http.StatusUnauthorized, "invalid email or password")
+	assertAuditEvent(t, audit.String(), map[string]any{
+		"event":  "auth.login",
+		"result": "failed",
+		"email":  "missing@example.com",
+		"reason": "invalid_credentials",
+	})
+	assertAuditDoesNotContain(t, audit.String(), "password123", "should-not-log", "Authorization", "Bearer")
+}
+
+func TestHandlerRegisterSuccess_WritesAuditEvent(t *testing.T) {
+	var audit bytes.Buffer
+	restore := logger.SetAuditOutput(&audit)
+	defer restore()
+
+	router := newAuthAuditTestRouter(NewService(newFakeUserRepository(), testTokenConfig()))
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewBufferString(`{
+		"email":"NEW@example.com",
+		"full_name":"New User",
+		"password":"password123"
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d, body=%s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	assertAuditEvent(t, audit.String(), map[string]any{
+		"event":  "auth.register",
+		"result": "success",
+		"email":  "new@example.com",
+		"role":   "user",
+	})
+	assertAuditDoesNotContain(t, audit.String(), "password123")
 }
 
 func TestHandlerLogin_UsesRateLimiterBeforeHandler(t *testing.T) {
@@ -160,6 +258,10 @@ func TestHandlerMe_ReturnsAuthenticatedContext(t *testing.T) {
 }
 
 func TestHandlerLogout_RevokesCurrentToken(t *testing.T) {
+	var audit bytes.Buffer
+	restore := logger.SetAuditOutput(&audit)
+	defer restore()
+
 	gin.SetMode(gin.TestMode)
 	cfg := testTokenConfig()
 	store := NewMemoryTokenRevocationStore()
@@ -188,6 +290,12 @@ func TestHandlerLogout_RevokesCurrentToken(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("logout status = %d, want %d, body=%s", w.Code, http.StatusOK, w.Body.String())
 	}
+	assertAuditEvent(t, audit.String(), map[string]any{
+		"event":   "auth.logout",
+		"result":  "success",
+		"user_id": "user-1",
+		"role":    "user",
+	})
 
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
@@ -231,6 +339,10 @@ func TestHandlerLogout_TokenMissingJTIUnauthorized(t *testing.T) {
 }
 
 func TestHandlerLogout_RevocationErrorReturnsServiceUnavailable(t *testing.T) {
+	var audit bytes.Buffer
+	restore := logger.SetAuditOutput(&audit)
+	defer restore()
+
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	api := router.Group("/api/v1")
@@ -253,6 +365,11 @@ func TestHandlerLogout_RevocationErrorReturnsServiceUnavailable(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assertErrorResponse(t, w, http.StatusServiceUnavailable, "logout failed")
+	assertAuditEvent(t, audit.String(), map[string]any{
+		"event":  "auth.logout",
+		"result": "failed",
+		"reason": "revocation_store_error",
+	})
 }
 
 func assertErrorResponse(t *testing.T, w *httptest.ResponseRecorder, status int, message string) {
@@ -274,6 +391,48 @@ func assertErrorResponse(t *testing.T, w *httptest.ResponseRecorder, status int,
 	}
 	if _, ok := body["data"]; ok {
 		t.Fatal("error response should not include data")
+	}
+}
+
+func newAuthAuditTestRouter(service *Service) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("request_id", "req-audit-1")
+		c.Next()
+	})
+	api := router.Group("/api/v1")
+	passThrough := func(c *gin.Context) { c.Next() }
+	RegisterRoutes(api, service, passThrough, passThrough, passThrough)
+	return router
+}
+
+func assertAuditEvent(t *testing.T, raw string, expected map[string]any) {
+	t.Helper()
+
+	entries := strings.Split(strings.TrimSpace(raw), "\n")
+	if len(entries) == 0 || entries[0] == "" {
+		t.Fatal("expected audit log entry, got empty output")
+	}
+
+	var entry map[string]any
+	if err := json.Unmarshal([]byte(entries[len(entries)-1]), &entry); err != nil {
+		t.Fatalf("audit json unmarshal error = %v, raw=%s", err, raw)
+	}
+	for key, want := range expected {
+		if got := entry[key]; got != want {
+			t.Fatalf("audit[%s] = %v, want %v; entry=%+v", key, got, want, entry)
+		}
+	}
+}
+
+func assertAuditDoesNotContain(t *testing.T, raw string, forbidden ...string) {
+	t.Helper()
+
+	for _, value := range forbidden {
+		if strings.Contains(raw, value) {
+			t.Fatalf("audit output contained forbidden value %q: %s", value, raw)
+		}
 	}
 }
 

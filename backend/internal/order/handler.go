@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"stylemind/internal/errs"
+	"stylemind/pkg/logger"
 
 	"stylemind/pkg/pagination"
 	"stylemind/pkg/response"
@@ -106,16 +107,50 @@ func (h *Handler) GetAdmin(c *gin.Context) {
 func (h *Handler) UpdateStatus(c *gin.Context) {
 	var req UpdateStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Audit(c, "admin.order_status.update", logger.AuditResultFailed, map[string]any{
+			"order_id": c.Param("id"),
+			"reason":   "invalid_payload",
+		})
 		response.Error(c, http.StatusBadRequest, "invalid payload")
 		return
 	}
 	if err := validator.Validate.Struct(req); err != nil {
+		logger.Audit(c, "admin.order_status.update", logger.AuditResultFailed, map[string]any{
+			"order_id":   c.Param("id"),
+			"new_status": req.Status,
+			"reason":     "validation_error",
+		})
 		response.Error(c, http.StatusBadRequest, "validation failed")
+		return
+	}
+
+	currentOrder, err := h.service.GetOrder(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		logger.Audit(c, "admin.order_status.update", logger.AuditResultFailed, map[string]any{
+			"order_id":   c.Param("id"),
+			"new_status": req.Status,
+			"reason":     safeOrderAuditReason(err),
+		})
+		if errors.Is(err, errs.ErrInvalidID) {
+			response.Error(c, http.StatusBadRequest, "invalid order id")
+			return
+		}
+		if errors.Is(err, errs.ErrOrderNotFound) {
+			response.Error(c, http.StatusNotFound, "order not found")
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "failed to update order status")
 		return
 	}
 
 	order, err := h.service.UpdateStatus(c.Request.Context(), c.Param("id"), req.Status)
 	if err != nil {
+		logger.Audit(c, "admin.order_status.update", logger.AuditResultFailed, map[string]any{
+			"order_id":   c.Param("id"),
+			"old_status": currentOrder.Status,
+			"new_status": req.Status,
+			"reason":     safeOrderAuditReason(err),
+		})
 		if errors.Is(err, errs.ErrInvalidID) {
 			response.Error(c, http.StatusBadRequest, "invalid order id")
 			return
@@ -135,5 +170,25 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 		response.Error(c, http.StatusInternalServerError, "failed to update order status")
 		return
 	}
+	logger.Audit(c, "admin.order_status.update", logger.AuditResultSuccess, map[string]any{
+		"order_id":   order.ID,
+		"old_status": currentOrder.Status,
+		"new_status": order.Status,
+	})
 	response.Success(c, http.StatusOK, "order status updated", order)
+}
+
+func safeOrderAuditReason(err error) string {
+	switch {
+	case errors.Is(err, errs.ErrInvalidID):
+		return "validation_error"
+	case errors.Is(err, errs.ErrOrderNotFound):
+		return "not_found"
+	case errors.Is(err, errs.ErrInvalidOrderStatus):
+		return "validation_error"
+	case errors.Is(err, errs.ErrInvalidOrderStatusTransition):
+		return "invalid_status_transition"
+	default:
+		return "internal_error"
+	}
 }
