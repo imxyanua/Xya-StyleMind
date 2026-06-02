@@ -8,10 +8,19 @@ import (
 )
 
 type Service struct {
-	repo *Repository
+	repo OrderRepository
 }
 
-func NewService(repo *Repository) *Service {
+type OrderRepository interface {
+	GetOrCreateCart(ctx context.Context, userID string) (string, error)
+	CreateOrderFromCart(ctx context.Context, userID, cartID string) (string, error)
+	GetOrderByIDForUser(ctx context.Context, orderID, userID string) (*OrderResponse, error)
+	ListOrdersByUser(ctx context.Context, userID string, limit, offset int) ([]OrderResponse, int64, error)
+	UpdateOrderStatus(ctx context.Context, orderID, status string, allowedCurrentStatuses []string) error
+	GetOrderByID(ctx context.Context, orderID string) (*OrderResponse, error)
+}
+
+func NewService(repo OrderRepository) *Service {
 	return &Service{repo: repo}
 }
 

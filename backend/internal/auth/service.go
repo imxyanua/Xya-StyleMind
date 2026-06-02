@@ -11,11 +11,17 @@ import (
 )
 
 type Service struct {
-	repo      *Repository
+	repo      UserRepository
 	jwtSecret string
 }
 
-func NewService(repo *Repository, jwtSecret string) *Service {
+type UserRepository interface {
+	CreateUser(ctx context.Context, user *User) error
+	GetUserByEmail(ctx context.Context, email string) (*User, error)
+	GetUserByID(ctx context.Context, id string) (*User, error)
+}
+
+func NewService(repo UserRepository, jwtSecret string) *Service {
 	return &Service{repo: repo, jwtSecret: jwtSecret}
 }
 
