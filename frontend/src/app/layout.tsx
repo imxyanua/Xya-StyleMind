@@ -31,6 +31,9 @@ export default function RootLayout({
               <Link href="/orders" className="hover:underline">
                 Orders
               </Link>
+              <Link href="/admin" className="hover:underline">
+                Admin
+              </Link>
               <Link href="/login" className="hover:underline">
                 Login
               </Link>

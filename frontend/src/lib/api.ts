@@ -1,5 +1,6 @@
 import { ApiError, type ApiResponse } from "@/types/api";
 import type { Cart } from "@/types/cart";
+import type { Category } from "@/types/category";
 import type { Order } from "@/types/order";
 import type { Product } from "@/types/product";
 
@@ -89,6 +90,46 @@ export async function fetchProductById(id: string) {
   return apiRequest<Product>(`/products/${id}`, { method: "GET" }, { auth: false });
 }
 
+export async function fetchCategories() {
+  return apiRequest<Category[]>("/categories?limit=100", { method: "GET" }, { auth: false });
+}
+
+export type ProductInput = {
+  name: string;
+  description: string;
+  price: number;
+  stock: number;
+  category_id: string;
+  style: string;
+  color: string;
+  image_url: string;
+};
+
+export async function createCategory(input: { name: string; slug: string }) {
+  return apiRequest<Category>("/admin/categories", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function createProduct(input: ProductInput) {
+  return apiRequest<Product>("/admin/products", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateProduct(id: string, input: ProductInput) {
+  return apiRequest<Product>(`/admin/products/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteProduct(id: string) {
+  return apiRequest<{ id: string }>(`/admin/products/${id}`, { method: "DELETE" });
+}
+
 export async function addToCart(productId: string, quantity: number) {
   return apiRequest<Cart>("/cart/items", {
     method: "POST",
@@ -133,4 +174,11 @@ export async function fetchMyOrders(params: OrderListParams = {}) {
   }
   const query = searchParams.toString();
   return apiRequest<Order[]>(`/orders${query ? `?${query}` : ""}`, { method: "GET" });
+}
+
+export async function updateOrderStatus(id: string, status: Order["status"]) {
+  return apiRequest<Order>(`/admin/orders/${id}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status }),
+  });
 }
