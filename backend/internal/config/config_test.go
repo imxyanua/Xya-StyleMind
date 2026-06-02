@@ -6,6 +6,8 @@ func TestLoad_ParsesCORSAllowedOrigins(t *testing.T) {
 	t.Setenv("APP_ENV", "development")
 	t.Setenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000, https://example.com")
 	t.Setenv("JWT_SECRET", "test-secret")
+	t.Setenv("JWT_ISSUER", "test-issuer")
+	t.Setenv("JWT_AUDIENCE", "test-audience")
 
 	cfg := Load()
 
@@ -14,5 +16,11 @@ func TestLoad_ParsesCORSAllowedOrigins(t *testing.T) {
 	}
 	if cfg.CORSAllowedOrigins[1] != "https://example.com" {
 		t.Fatalf("CORSAllowedOrigins[1] = %q, want https://example.com", cfg.CORSAllowedOrigins[1])
+	}
+	if cfg.JWTIssuer != "test-issuer" {
+		t.Fatalf("JWTIssuer = %q, want test-issuer", cfg.JWTIssuer)
+	}
+	if cfg.JWTAudience != "test-audience" {
+		t.Fatalf("JWTAudience = %q, want test-audience", cfg.JWTAudience)
 	}
 }

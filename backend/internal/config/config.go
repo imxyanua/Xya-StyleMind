@@ -12,6 +12,8 @@ type Config struct {
 	AppEnv             string
 	Port               string
 	JWTSecret          string
+	JWTIssuer          string
+	JWTAudience        string
 	CORSAllowedOrigins []string
 	Database           DatabaseConfig
 }
@@ -34,6 +36,8 @@ func Load() Config {
 		AppEnv:             appEnv,
 		Port:               getEnv("PORT", "8080"),
 		JWTSecret:          getEnv("JWT_SECRET", "change-me-in-production"),
+		JWTIssuer:          getEnv("JWT_ISSUER", "stylemind-api"),
+		JWTAudience:        getEnv("JWT_AUDIENCE", "stylemind-web"),
 		CORSAllowedOrigins: getEnvList("CORS_ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -83,6 +87,12 @@ func (c Config) validate() {
 
 	if c.JWTSecret == "" || c.JWTSecret == "change-me-in-production" || c.JWTSecret == "change_me_in_production" {
 		log.Fatal("JWT_SECRET must be configured in production")
+	}
+	if c.JWTIssuer == "" {
+		log.Fatal("JWT_ISSUER must be configured in production")
+	}
+	if c.JWTAudience == "" {
+		log.Fatal("JWT_AUDIENCE must be configured in production")
 	}
 	for _, origin := range c.CORSAllowedOrigins {
 		if origin == "*" {

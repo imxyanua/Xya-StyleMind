@@ -16,7 +16,7 @@ import (
 func TestJWTAuth_MissingHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.GET("/protected", JWTAuth("secret"), func(c *gin.Context) {
+	r.GET("/protected", JWTAuth(middlewareTestTokenConfig()), func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 
@@ -40,16 +40,16 @@ func TestJWTAuth_MissingHeader(t *testing.T) {
 func TestJWTAuth_ValidToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	secret := "secret"
+	cfg := middlewareTestTokenConfig()
 
-	r.GET("/protected", JWTAuth(secret), func(c *gin.Context) {
+	r.GET("/protected", JWTAuth(cfg), func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"user_id": c.GetString("user_id"),
 			"role":    c.GetString("user_role"),
 		})
 	})
 
-	token, err := auth.GenerateToken(secret, "u1", "admin")
+	token, err := auth.GenerateToken(cfg, "u1", "admin")
 	if err != nil {
 		t.Fatalf("GenerateToken error = %v", err)
 	}
@@ -78,7 +78,7 @@ func TestJWTAuth_ValidToken(t *testing.T) {
 func TestJWTAuth_MalformedHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.GET("/protected", JWTAuth("secret"), func(c *gin.Context) {
+	r.GET("/protected", JWTAuth(middlewareTestTokenConfig()), func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
 
@@ -95,8 +95,8 @@ func TestJWTAuth_MalformedHeader(t *testing.T) {
 func TestJWTAuth_ExpiredToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	secret := "secret"
-	r.GET("/protected", JWTAuth(secret), func(c *gin.Context) {
+	cfg := middlewareTestTokenConfig()
+	r.GET("/protected", JWTAuth(cfg), func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
 
@@ -104,11 +104,16 @@ func TestJWTAuth_ExpiredToken(t *testing.T) {
 		UserID: "user-1",
 		Role:   "user",
 		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    cfg.Issuer,
+			Subject:   "user-1",
+			Audience:  jwt.ClaimStrings{cfg.Audience},
+			ID:        "token-id",
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now().Add(-time.Hour)),
+			NotBefore: jwt.NewNumericDate(time.Now().Add(-time.Hour)),
 		},
 	})
-	tokenString, err := token.SignedString([]byte(secret))
+	tokenString, err := token.SignedString([]byte(cfg.Secret))
 	if err != nil {
 		t.Fatalf("SignedString error = %v", err)
 	}
@@ -120,5 +125,49 @@ func TestJWTAuth_ExpiredToken(t *testing.T) {
 
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", w.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestJWTAuth_WrongIssuer(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cfg := middlewareTestTokenConfig()
+	r := gin.New()
+	r.GET("/protected", JWTAuth(cfg), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, auth.Claims{
+		UserID: "user-1",
+		Role:   "user",
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "wrong-issuer",
+			Subject:   "user-1",
+			Audience:  jwt.ClaimStrings{cfg.Audience},
+			ID:        "token-id",
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+		},
+	})
+	tokenString, err := token.SignedString([]byte(cfg.Secret))
+	if err != nil {
+		t.Fatalf("SignedString error = %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+tokenString)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusUnauthorized)
+	}
+}
+
+func middlewareTestTokenConfig() auth.TokenConfig {
+	return auth.TokenConfig{
+		Secret:   "test-secret",
+		Issuer:   "stylemind-api",
+		Audience: "stylemind-web",
 	}
 }

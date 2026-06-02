@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func JWTAuth(secret string) gin.HandlerFunc {
+func JWTAuth(tokenConfig auth.TokenConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" {
@@ -27,7 +27,7 @@ func JWTAuth(secret string) gin.HandlerFunc {
 			return
 		}
 
-		claims, err := auth.ParseToken(secret, parts[1])
+		claims, err := auth.ParseToken(tokenConfig, parts[1])
 		if err != nil {
 			response.Error(c, http.StatusUnauthorized, errs.ErrUnauthorized.Error())
 			c.Abort()

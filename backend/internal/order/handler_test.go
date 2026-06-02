@@ -36,7 +36,9 @@ func newProtectedOrderTestRouter(repo *fakeOrderRepository, secret string) *gin.
 	router := gin.New()
 	api := router.Group("/api/v1")
 	admin := api.Group("/admin")
-	jwtAuth := middleware.JWTAuth(secret)
+	tokenConfig := orderTestTokenConfig()
+	tokenConfig.Secret = secret
+	jwtAuth := middleware.JWTAuth(tokenConfig)
 	admin.Use(jwtAuth, middleware.RequireRole("admin"))
 	RegisterRoutes(api, admin, jwtAuth, NewService(repo))
 	return router
@@ -145,7 +147,7 @@ func TestProtectedOrderRoutes_RequireToken(t *testing.T) {
 func TestProtectedOrderRoutes_MissingBearerPrefix(t *testing.T) {
 	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
 
-	token, err := auth.GenerateToken("test-secret", "user-1", "user")
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "user-1", "user")
 	if err != nil {
 		t.Fatalf("GenerateToken error = %v", err)
 	}
@@ -161,7 +163,9 @@ func TestProtectedOrderRoutes_MissingBearerPrefix(t *testing.T) {
 func TestProtectedOrderRoutes_WrongSignature(t *testing.T) {
 	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
 
-	token, err := auth.GenerateToken("other-secret", "user-1", "user")
+	wrongConfig := orderTestTokenConfig()
+	wrongConfig.Secret = "other-secret"
+	token, err := auth.GenerateToken(wrongConfig, "user-1", "user")
 	if err != nil {
 		t.Fatalf("GenerateToken error = %v", err)
 	}
@@ -181,11 +185,16 @@ func TestProtectedOrderRoutes_ExpiredToken(t *testing.T) {
 		UserID: "user-1",
 		Role:   "user",
 		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    orderTestTokenConfig().Issuer,
+			Subject:   "user-1",
+			Audience:  jwt.ClaimStrings{orderTestTokenConfig().Audience},
+			ID:        "token-id",
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now().Add(-time.Hour)),
+			NotBefore: jwt.NewNumericDate(time.Now().Add(-time.Hour)),
 		},
 	})
-	tokenString, err := token.SignedString([]byte("test-secret"))
+	tokenString, err := token.SignedString([]byte(orderTestTokenConfig().Secret))
 	if err != nil {
 		t.Fatalf("SignedString error = %v", err)
 	}
@@ -201,7 +210,7 @@ func TestProtectedOrderRoutes_ExpiredToken(t *testing.T) {
 func TestProtectedAdminOrderStatus_UserForbidden(t *testing.T) {
 	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
 
-	token, err := auth.GenerateToken("test-secret", "user-1", "user")
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "user-1", "user")
 	if err != nil {
 		t.Fatalf("GenerateToken error = %v", err)
 	}
@@ -218,7 +227,7 @@ func TestProtectedAdminOrderStatus_UserForbidden(t *testing.T) {
 func TestProtectedAdminOrdersList_UserForbidden(t *testing.T) {
 	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
 
-	token, err := auth.GenerateToken("test-secret", "user-1", "user")
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "user-1", "user")
 	if err != nil {
 		t.Fatalf("GenerateToken error = %v", err)
 	}
@@ -235,7 +244,7 @@ func TestProtectedAdminOrdersList_AdminAllowed(t *testing.T) {
 	repo := &fakeOrderRepository{}
 	router := newProtectedOrderTestRouter(repo, "test-secret")
 
-	token, err := auth.GenerateToken("test-secret", "admin-1", "admin")
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
 	if err != nil {
 		t.Fatalf("GenerateToken error = %v", err)
 	}
@@ -257,7 +266,7 @@ func TestProtectedAdminOrderDetail_AdminAllowed(t *testing.T) {
 	repo := &fakeOrderRepository{}
 	router := newProtectedOrderTestRouter(repo, "test-secret")
 
-	token, err := auth.GenerateToken("test-secret", "admin-1", "admin")
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
 	if err != nil {
 		t.Fatalf("GenerateToken error = %v", err)
 	}
@@ -279,7 +288,7 @@ func TestProtectedAdminOrderDetail_AdminAllowed(t *testing.T) {
 func TestProtectedAdminOrderDetail_InvalidID(t *testing.T) {
 	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
 
-	token, err := auth.GenerateToken("test-secret", "admin-1", "admin")
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
 	if err != nil {
 		t.Fatalf("GenerateToken error = %v", err)
 	}
@@ -296,7 +305,7 @@ func TestProtectedAdminOrderStatus_AdminAllowed(t *testing.T) {
 	repo := &fakeOrderRepository{}
 	router := newProtectedOrderTestRouter(repo, "test-secret")
 
-	token, err := auth.GenerateToken("test-secret", "admin-1", "admin")
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
 	if err != nil {
 		t.Fatalf("GenerateToken error = %v", err)
 	}
@@ -335,5 +344,13 @@ func assertOrderErrorResponse(t *testing.T, w *httptest.ResponseRecorder, status
 	}
 	if _, ok := body["data"]; ok {
 		t.Fatal("error response should not include data")
+	}
+}
+
+func orderTestTokenConfig() auth.TokenConfig {
+	return auth.TokenConfig{
+		Secret:   "test-secret",
+		Issuer:   "stylemind-api",
+		Audience: "stylemind-web",
 	}
 }

@@ -50,9 +50,14 @@ func main() {
 	api := router.Group("/api/v1")
 	health.RegisterRoutes(api, db)
 
+	tokenConfig := auth.TokenConfig{
+		Secret:   cfg.JWTSecret,
+		Issuer:   cfg.JWTIssuer,
+		Audience: cfg.JWTAudience,
+	}
 	authRepo := auth.NewRepository(db)
-	authService := auth.NewService(authRepo, cfg.JWTSecret)
-	jwtAuth := middleware.JWTAuth(cfg.JWTSecret)
+	authService := auth.NewService(authRepo, tokenConfig)
+	jwtAuth := middleware.JWTAuth(tokenConfig)
 	auth.RegisterRoutes(api, authService, jwtAuth, middleware.RateLimit(10, time.Minute))
 
 	admin := api.Group("/admin")

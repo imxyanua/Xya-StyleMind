@@ -22,7 +22,7 @@ func newAuthTestRouter(service *Service) *gin.Engine {
 }
 
 func TestHandlerRegister_InvalidPayload(t *testing.T) {
-	router := newAuthTestRouter(NewService(newFakeUserRepository(), "test-secret"))
+	router := newAuthTestRouter(NewService(newFakeUserRepository(), testTokenConfig()))
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewBufferString(`{bad json`))
@@ -33,7 +33,7 @@ func TestHandlerRegister_InvalidPayload(t *testing.T) {
 }
 
 func TestHandlerRegister_ValidationFailed(t *testing.T) {
-	router := newAuthTestRouter(NewService(newFakeUserRepository(), "test-secret"))
+	router := newAuthTestRouter(NewService(newFakeUserRepository(), testTokenConfig()))
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewBufferString(`{
@@ -58,7 +58,7 @@ func TestHandlerLogin_InvalidCredentialsDoesNotLeakDetails(t *testing.T) {
 		PasswordHash: string(hash),
 		Role:         "user",
 	}
-	router := newAuthTestRouter(NewService(repo, "test-secret"))
+	router := newAuthTestRouter(NewService(repo, testTokenConfig()))
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewBufferString(`{
@@ -84,7 +84,7 @@ func TestHandlerMe_ReturnsAuthenticatedContext(t *testing.T) {
 		c.Next()
 	}
 	passThrough := func(c *gin.Context) { c.Next() }
-	RegisterRoutes(api, NewService(newFakeUserRepository(), "test-secret"), authMiddleware, passThrough)
+	RegisterRoutes(api, NewService(newFakeUserRepository(), testTokenConfig()), authMiddleware, passThrough)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)

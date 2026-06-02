@@ -47,7 +47,8 @@ func (r *fakeUserRepository) GetUserByID(_ context.Context, id string) (*User, e
 
 func TestServiceRegister_CreatesUserWithNormalizedEmailAndToken(t *testing.T) {
 	repo := newFakeUserRepository()
-	service := NewService(repo, "test-secret")
+	cfg := testTokenConfig()
+	service := NewService(repo, cfg)
 
 	result, err := service.Register(context.Background(), RegisterRequest{
 		Email:    "  USER@Example.COM ",
@@ -67,7 +68,7 @@ func TestServiceRegister_CreatesUserWithNormalizedEmailAndToken(t *testing.T) {
 	}
 
 	token := result["token"].(string)
-	claims, err := ParseToken("test-secret", token)
+	claims, err := ParseToken(cfg, token)
 	if err != nil {
 		t.Fatalf("ParseToken error = %v", err)
 	}
@@ -90,7 +91,7 @@ func TestServiceRegister_CreatesUserWithNormalizedEmailAndToken(t *testing.T) {
 func TestServiceRegister_DuplicateEmail(t *testing.T) {
 	repo := newFakeUserRepository()
 	repo.usersByEmail["user@example.com"] = &User{Email: "user@example.com"}
-	service := NewService(repo, "test-secret")
+	service := NewService(repo, testTokenConfig())
 
 	_, err := service.Register(context.Background(), RegisterRequest{
 		Email:    "USER@example.com",
@@ -115,7 +116,8 @@ func TestServiceLogin_SuccessWithNormalizedEmail(t *testing.T) {
 		PasswordHash: string(hash),
 		Role:         "admin",
 	}
-	service := NewService(repo, "test-secret")
+	cfg := testTokenConfig()
+	service := NewService(repo, cfg)
 
 	result, err := service.Login(context.Background(), LoginRequest{
 		Email:    "  USER@example.com ",
@@ -125,7 +127,7 @@ func TestServiceLogin_SuccessWithNormalizedEmail(t *testing.T) {
 		t.Fatalf("Login error = %v", err)
 	}
 
-	claims, err := ParseToken("test-secret", result["token"].(string))
+	claims, err := ParseToken(cfg, result["token"].(string))
 	if err != nil {
 		t.Fatalf("ParseToken error = %v", err)
 	}
@@ -144,7 +146,7 @@ func TestServiceLogin_InvalidPassword(t *testing.T) {
 		Email:        "user@example.com",
 		PasswordHash: string(hash),
 	}
-	service := NewService(repo, "test-secret")
+	service := NewService(repo, testTokenConfig())
 
 	_, err = service.Login(context.Background(), LoginRequest{
 		Email:    "user@example.com",
@@ -156,7 +158,7 @@ func TestServiceLogin_InvalidPassword(t *testing.T) {
 }
 
 func TestServiceLogin_UserNotFound(t *testing.T) {
-	service := NewService(newFakeUserRepository(), "test-secret")
+	service := NewService(newFakeUserRepository(), testTokenConfig())
 
 	_, err := service.Login(context.Background(), LoginRequest{
 		Email:    "missing@example.com",

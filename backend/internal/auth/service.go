@@ -11,8 +11,8 @@ import (
 )
 
 type Service struct {
-	repo      UserRepository
-	jwtSecret string
+	repo        UserRepository
+	tokenConfig TokenConfig
 }
 
 type UserRepository interface {
@@ -21,8 +21,8 @@ type UserRepository interface {
 	GetUserByID(ctx context.Context, id string) (*User, error)
 }
 
-func NewService(repo UserRepository, jwtSecret string) *Service {
-	return &Service{repo: repo, jwtSecret: jwtSecret}
+func NewService(repo UserRepository, tokenConfig TokenConfig) *Service {
+	return &Service{repo: repo, tokenConfig: tokenConfig}
 }
 
 func (s *Service) Register(ctx context.Context, req RegisterRequest) (map[string]interface{}, error) {
@@ -51,7 +51,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (map[string
 		return nil, err
 	}
 
-	token, err := GenerateToken(s.jwtSecret, user.ID, user.Role)
+	token, err := GenerateToken(s.tokenConfig, user.ID, user.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (map[string]inter
 		return nil, errs.ErrInvalidCredentials
 	}
 
-	token, err := GenerateToken(s.jwtSecret, user.ID, user.Role)
+	token, err := GenerateToken(s.tokenConfig, user.ID, user.Role)
 	if err != nil {
 		return nil, err
 	}
