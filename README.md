@@ -111,6 +111,31 @@ curl http://localhost:8080/api/v1/health
 - Seed is idempotent via deterministic IDs and upsert logic, so running multiple times will not duplicate records.
 - Seed does not reset or delete existing database data.
 
+### Backend Testing
+
+Run unit/API tests:
+
+```bash
+cd backend
+go test ./...
+```
+
+Run backend build verification:
+
+```bash
+cd backend
+go build ./...
+```
+
+Run integration tests with PostgreSQL:
+
+```bash
+cd backend
+TEST_DATABASE_URL="postgres://postgres:postgres@localhost:5432/stylemind?sslmode=disable" go test -tags=integration ./internal/order ./internal/auth ./internal/product ./internal/cart
+```
+
+Integration tests are opt-in. If `TEST_DATABASE_URL` is not set, they skip safely. GitHub Actions runs backend unit/API tests, build verification, and integration tests against a PostgreSQL service.
+
 ### Security & Secrets
 
 - Never commit real `.env` files to the repository.
