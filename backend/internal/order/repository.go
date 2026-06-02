@@ -214,19 +214,47 @@ func (r *Repository) GetOrderByID(ctx context.Context, orderID string) (*OrderRe
 	return o, nil
 }
 
-func (r *Repository) UpdateOrderStatus(ctx context.Context, orderID, status string) error {
-	tag, err := r.db.Exec(ctx, `
+func (r *Repository) UpdateOrderStatus(ctx context.Context, orderID, status string, allowedCurrentStatuses []string) error {
+	if len(allowedCurrentStatuses) == 0 {
+		return errs.ErrInvalidOrderStatus
+	}
+
+	args := []any{orderID, status}
+	placeholders := make([]string, len(allowedCurrentStatuses))
+	for i, currentStatus := range allowedCurrentStatuses {
+		placeholders[i] = fmt.Sprintf("$%d", i+3)
+		args = append(args, currentStatus)
+	}
+
+	query := fmt.Sprintf(`
 		UPDATE orders
 		SET status = $2, updated_at = NOW()
-		WHERE id = $1
-	`, orderID, status)
+		WHERE id = $1 AND status IN (%s)
+	`, strings.Join(placeholders, ","))
+
+	tag, err := r.db.Exec(ctx, query, args...)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return errs.ErrOrderNotFound
+		if _, err := r.GetOrderStatus(ctx, orderID); err != nil {
+			return err
+		}
+		return errs.ErrInvalidOrderStatusTransition
 	}
 	return nil
+}
+
+func (r *Repository) GetOrderStatus(ctx context.Context, orderID string) (string, error) {
+	var status string
+	err := r.db.QueryRow(ctx, `SELECT status FROM orders WHERE id = $1`, orderID).Scan(&status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", errs.ErrOrderNotFound
+		}
+		return "", err
+	}
+	return status, nil
 }
 
 func (r *Repository) GetOrderItems(ctx context.Context, orderID string) ([]OrderItem, error) {

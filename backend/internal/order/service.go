@@ -44,7 +44,10 @@ func (s *Service) UpdateStatus(ctx context.Context, orderID, status string) (*Or
 	if _, err := uuid.Parse(orderID); err != nil {
 		return nil, errs.ErrInvalidID
 	}
-	if err := s.repo.UpdateOrderStatus(ctx, orderID, status); err != nil {
+	if !IsValidStatus(status) {
+		return nil, errs.ErrInvalidOrderStatus
+	}
+	if err := s.repo.UpdateOrderStatus(ctx, orderID, status, AllowedCurrentStatuses(status)); err != nil {
 		return nil, err
 	}
 	return s.repo.GetOrderByID(ctx, orderID)

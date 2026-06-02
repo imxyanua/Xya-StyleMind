@@ -95,6 +95,14 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 			response.Error(c, http.StatusNotFound, "order not found")
 			return
 		}
+		if errors.Is(err, errs.ErrInvalidOrderStatus) {
+			response.Error(c, http.StatusBadRequest, "invalid order status")
+			return
+		}
+		if errors.Is(err, errs.ErrInvalidOrderStatusTransition) {
+			response.Error(c, http.StatusBadRequest, "invalid order status transition")
+			return
+		}
 		response.Error(c, http.StatusInternalServerError, "failed to update order status")
 		return
 	}
