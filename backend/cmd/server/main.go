@@ -67,7 +67,13 @@ func main() {
 	if err := router.SetTrustedProxies(nil); err != nil {
 		log.Fatalf("failed to configure trusted proxies: %v", err)
 	}
-	router.Use(middleware.RequestID(), middleware.RequestLogger(), gin.Recovery())
+	router.Use(
+		middleware.RequestID(),
+		middleware.SecurityHeaders(),
+		middleware.RequestLogger(),
+		gin.Recovery(),
+		middleware.RequestBodyLimit(cfg.MaxRequestBodyBytes),
+	)
 	router.Use(cors.New(middleware.CORSConfig(cfg.CORSAllowedOrigins)))
 
 	api := router.Group("/api/v1")
