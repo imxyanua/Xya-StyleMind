@@ -16,6 +16,7 @@ type OrderRepository interface {
 	CreateOrderFromCart(ctx context.Context, userID, cartID string) (string, error)
 	GetOrderByIDForUser(ctx context.Context, orderID, userID string) (*OrderResponse, error)
 	ListOrdersByUser(ctx context.Context, userID string, limit, offset int) ([]OrderResponse, int64, error)
+	ListOrders(ctx context.Context, limit, offset int) ([]OrderResponse, int64, error)
 	UpdateOrderStatus(ctx context.Context, orderID, status string, allowedCurrentStatuses []string) error
 	GetOrderByID(ctx context.Context, orderID string) (*OrderResponse, error)
 }
@@ -42,11 +43,22 @@ func (s *Service) ListMyOrders(ctx context.Context, userID string, limit, offset
 	return s.repo.ListOrdersByUser(ctx, userID, limit, offset)
 }
 
+func (s *Service) ListOrders(ctx context.Context, limit, offset int) ([]OrderResponse, int64, error) {
+	return s.repo.ListOrders(ctx, limit, offset)
+}
+
 func (s *Service) GetMyOrder(ctx context.Context, userID, orderID string) (*OrderResponse, error) {
 	if _, err := uuid.Parse(orderID); err != nil {
 		return nil, errs.ErrInvalidID
 	}
 	return s.repo.GetOrderByIDForUser(ctx, orderID, userID)
+}
+
+func (s *Service) GetOrder(ctx context.Context, orderID string) (*OrderResponse, error) {
+	if _, err := uuid.Parse(orderID); err != nil {
+		return nil, errs.ErrInvalidID
+	}
+	return s.repo.GetOrderByID(ctx, orderID)
 }
 
 func (s *Service) UpdateStatus(ctx context.Context, orderID, status string) (*OrderResponse, error) {

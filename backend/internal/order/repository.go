@@ -172,6 +172,53 @@ func (r *Repository) ListOrdersByUser(ctx context.Context, userID string, limit,
 	return out, total, nil
 }
 
+func (r *Repository) ListOrders(ctx context.Context, limit, offset int) ([]OrderResponse, int64, error) {
+	var total int64
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM orders`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT id, user_id, status, total_amount, created_at, updated_at
+		FROM orders
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	out := make([]OrderResponse, 0)
+	orderIDs := make([]string, 0)
+	for rows.Next() {
+		var o OrderResponse
+		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalAmount, &o.CreatedAt, &o.UpdatedAt); err != nil {
+			return nil, 0, err
+		}
+		o.Items = make([]OrderItem, 0)
+		out = append(out, o)
+		orderIDs = append(orderIDs, o.ID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	if len(orderIDs) == 0 {
+		return out, total, nil
+	}
+
+	itemsByOrderID, err := r.GetOrderItemsByOrderIDs(ctx, orderIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range out {
+		if items, ok := itemsByOrderID[out[i].ID]; ok {
+			out[i].Items = items
+		}
+	}
+	return out, total, nil
+}
+
 func (r *Repository) GetOrderByIDForUser(ctx context.Context, orderID, userID string) (*OrderResponse, error) {
 	o := &OrderResponse{}
 	err := r.db.QueryRow(ctx, `

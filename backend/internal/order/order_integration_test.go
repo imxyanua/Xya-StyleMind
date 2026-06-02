@@ -103,6 +103,23 @@ func TestOrderCheckoutFlowIntegration(t *testing.T) {
 	if total != 1 || len(orders) != 1 || len(orders[0].Items) != 1 {
 		t.Fatalf("orders total/list = %d/%+v, want one order with one item", total, orders)
 	}
+	adminOrders, adminTotal, err := service.ListOrders(ctx, 20, 0)
+	if err != nil {
+		t.Fatalf("ListOrders admin error = %v", err)
+	}
+	if adminTotal < 1 {
+		t.Fatalf("adminTotal = %d, want at least 1", adminTotal)
+	}
+	foundAdminOrder := false
+	for _, adminOrder := range adminOrders {
+		if adminOrder.ID == order.ID {
+			foundAdminOrder = len(adminOrder.Items) == 1
+			break
+		}
+	}
+	if !foundAdminOrder {
+		t.Fatalf("admin order list did not include order %s with items: %+v", order.ID, adminOrders)
+	}
 	if _, err := service.UpdateStatus(ctx, order.ID, StatusShipping); !errors.Is(err, errs.ErrInvalidOrderStatusTransition) {
 		t.Fatalf("UpdateStatus pending->shipping err = %v, want ErrInvalidOrderStatusTransition", err)
 	}

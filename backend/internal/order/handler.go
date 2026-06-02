@@ -25,6 +25,8 @@ func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, authMiddleware
 	orders.GET("", h.ListMine)
 	orders.GET("/:id", h.GetMine)
 
+	admin.GET("/orders", h.ListAdmin)
+	admin.GET("/orders/:id", h.GetAdmin)
 	admin.PUT("/orders/:id/status", h.UpdateStatus)
 }
 
@@ -59,6 +61,33 @@ func (h *Handler) ListMine(c *gin.Context) {
 func (h *Handler) GetMine(c *gin.Context) {
 	userID := c.GetString("user_id")
 	order, err := h.service.GetMyOrder(c.Request.Context(), userID, c.Param("id"))
+	if err != nil {
+		if errors.Is(err, errs.ErrInvalidID) {
+			response.Error(c, http.StatusBadRequest, "invalid order id")
+			return
+		}
+		if errors.Is(err, errs.ErrOrderNotFound) {
+			response.Error(c, http.StatusNotFound, "order not found")
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "failed to fetch order")
+		return
+	}
+	response.Success(c, http.StatusOK, "ok", order)
+}
+
+func (h *Handler) ListAdmin(c *gin.Context) {
+	page := pagination.Parse(c)
+	orders, total, err := h.service.ListOrders(c.Request.Context(), page.Limit, page.Offset)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "failed to fetch orders")
+		return
+	}
+	response.SuccessWithMeta(c, http.StatusOK, "ok", orders, pagination.BuildMeta(page.Page, page.Limit, total))
+}
+
+func (h *Handler) GetAdmin(c *gin.Context) {
+	order, err := h.service.GetOrder(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		if errors.Is(err, errs.ErrInvalidID) {
 			response.Error(c, http.StatusBadRequest, "invalid order id")

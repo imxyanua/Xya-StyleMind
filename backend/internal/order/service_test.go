@@ -18,6 +18,7 @@ type fakeOrderRepository struct {
 	getOrderForUserErr     error
 	getOrderErr            error
 	listOrdersErr          error
+	listAllOrdersErr       error
 	updateStatusErr        error
 	lastUserID             string
 	lastCartID             string
@@ -26,6 +27,8 @@ type fakeOrderRepository struct {
 	lastAllowedStatuses    []string
 	listLimit              int
 	listOffset             int
+	listAllLimit           int
+	listAllOffset          int
 	getOrderForUserCalled  bool
 	updateOrderStatusCalls int
 }
@@ -71,6 +74,15 @@ func (r *fakeOrderRepository) ListOrdersByUser(_ context.Context, userID string,
 		return nil, 0, r.listOrdersErr
 	}
 	return []OrderResponse{{ID: "order-1", UserID: userID, Items: []OrderItem{}}}, 1, nil
+}
+
+func (r *fakeOrderRepository) ListOrders(_ context.Context, limit, offset int) ([]OrderResponse, int64, error) {
+	r.listAllLimit = limit
+	r.listAllOffset = offset
+	if r.listAllOrdersErr != nil {
+		return nil, 0, r.listAllOrdersErr
+	}
+	return []OrderResponse{{ID: "admin-order-1", UserID: "user-1", Items: []OrderItem{}}}, 1, nil
 }
 
 func (r *fakeOrderRepository) UpdateOrderStatus(_ context.Context, orderID, status string, allowedCurrentStatuses []string) error {
@@ -135,6 +147,22 @@ func TestServiceListMyOrders_UsesAuthenticatedUserScope(t *testing.T) {
 	}
 }
 
+func TestServiceListOrders_AdminList(t *testing.T) {
+	repo := &fakeOrderRepository{}
+	service := NewService(repo)
+
+	orders, total, err := service.ListOrders(context.Background(), 50, 100)
+	if err != nil {
+		t.Fatalf("ListOrders error = %v", err)
+	}
+	if total != 1 || len(orders) != 1 {
+		t.Fatalf("orders len/total = %d/%d, want 1/1", len(orders), total)
+	}
+	if repo.listAllLimit != 50 || repo.listAllOffset != 100 {
+		t.Fatalf("repo list all pagination = limit:%d offset:%d, want 50/100", repo.listAllLimit, repo.listAllOffset)
+	}
+}
+
 func TestServiceGetMyOrder_InvalidID(t *testing.T) {
 	service := NewService(nil)
 
@@ -155,6 +183,29 @@ func TestServiceGetMyOrder_UsesAuthenticatedUserScope(t *testing.T) {
 	}
 	if order.ID != orderID || repo.lastUserID != "user-1" {
 		t.Fatalf("order/repo = %+v/%s, want scoped user order", order, repo.lastUserID)
+	}
+}
+
+func TestServiceGetOrder_AdminGetInvalidID(t *testing.T) {
+	service := NewService(nil)
+
+	_, err := service.GetOrder(context.Background(), "bad-id")
+	if !errors.Is(err, errs.ErrInvalidID) {
+		t.Fatalf("err = %v, want ErrInvalidID", err)
+	}
+}
+
+func TestServiceGetOrder_AdminGet(t *testing.T) {
+	repo := &fakeOrderRepository{}
+	service := NewService(repo)
+	orderID := uuid.NewString()
+
+	order, err := service.GetOrder(context.Background(), orderID)
+	if err != nil {
+		t.Fatalf("GetOrder error = %v", err)
+	}
+	if order.ID != orderID || repo.lastOrderID != orderID {
+		t.Fatalf("order/repo = %+v/%s, want order id %s", order, repo.lastOrderID, orderID)
 	}
 }
 
