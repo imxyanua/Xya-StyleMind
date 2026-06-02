@@ -3,6 +3,8 @@ package order
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"stylemind/internal/errs"
 
 	"github.com/google/uuid"
@@ -141,19 +143,33 @@ func (r *Repository) ListOrdersByUser(ctx context.Context, userID string, limit,
 	defer rows.Close()
 
 	out := make([]OrderResponse, 0)
+	orderIDs := make([]string, 0)
 	for rows.Next() {
 		var o OrderResponse
 		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalAmount, &o.CreatedAt, &o.UpdatedAt); err != nil {
 			return nil, 0, err
 		}
-		items, err := r.GetOrderItems(ctx, o.ID)
-		if err != nil {
-			return nil, 0, err
-		}
-		o.Items = items
+		o.Items = make([]OrderItem, 0)
 		out = append(out, o)
+		orderIDs = append(orderIDs, o.ID)
 	}
-	return out, total, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	if len(orderIDs) == 0 {
+		return out, total, nil
+	}
+
+	itemsByOrderID, err := r.GetOrderItemsByOrderIDs(ctx, orderIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range out {
+		if items, ok := itemsByOrderID[out[i].ID]; ok {
+			out[i].Items = items
+		}
+	}
+	return out, total, nil
 }
 
 func (r *Repository) GetOrderByIDForUser(ctx context.Context, orderID, userID string) (*OrderResponse, error) {
@@ -239,4 +255,47 @@ func (r *Repository) GetOrderItems(ctx context.Context, orderID string) ([]Order
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+func (r *Repository) GetOrderItemsByOrderIDs(ctx context.Context, orderIDs []string) (map[string][]OrderItem, error) {
+	itemsByOrderID := make(map[string][]OrderItem, len(orderIDs))
+	if len(orderIDs) == 0 {
+		return itemsByOrderID, nil
+	}
+
+	placeholders := make([]string, len(orderIDs))
+	args := make([]any, len(orderIDs))
+	for i, orderID := range orderIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = orderID
+		itemsByOrderID[orderID] = make([]OrderItem, 0)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT oi.order_id, oi.id, oi.product_id, oi.quantity, oi.unit_price, oi.subtotal,
+		       p.id, p.name, p.image_url, p.style, p.color
+		FROM order_items oi
+		JOIN products p ON p.id = oi.product_id
+		WHERE oi.order_id IN (%s)
+		ORDER BY oi.created_at ASC
+	`, strings.Join(placeholders, ","))
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var orderID string
+		var item OrderItem
+		if err := rows.Scan(
+			&orderID, &item.ID, &item.ProductID, &item.Quantity, &item.UnitPrice, &item.Subtotal,
+			&item.Product.ID, &item.Product.Name, &item.Product.ImageURL, &item.Product.Style, &item.Product.Color,
+		); err != nil {
+			return nil, err
+		}
+		itemsByOrderID[orderID] = append(itemsByOrderID[orderID], item)
+	}
+	return itemsByOrderID, rows.Err()
 }
