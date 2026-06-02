@@ -40,6 +40,18 @@ func main() {
 		log.Fatalf("migration failed: %v", err)
 	}
 
+	rateLimitStore, redisConfigured, err := middleware.NewRateLimitStoreFromConfig(cfg.Redis.Addr, cfg.Redis.Password, cfg.Redis.DB)
+	if err != nil {
+		log.Fatalf("rate limit store configuration failed: %v", err)
+	}
+	defer rateLimitStore.Close()
+	if redisConfigured {
+		log.Printf("rate limiter using redis at %s", cfg.Redis.Addr)
+	} else {
+		log.Printf("rate limiter using in-memory fallback; set REDIS_ADDR for multi-instance deployments")
+	}
+	authRateLimit := middleware.NewRateLimiter(rateLimitStore, 10, time.Minute, middleware.WithFailClosed(redisConfigured))
+
 	router := gin.New()
 	if err := router.SetTrustedProxies(nil); err != nil {
 		log.Fatalf("failed to configure trusted proxies: %v", err)
@@ -58,7 +70,13 @@ func main() {
 	authRepo := auth.NewRepository(db)
 	authService := auth.NewService(authRepo, tokenConfig)
 	jwtAuth := middleware.JWTAuth(tokenConfig)
-	auth.RegisterRoutes(api, authService, jwtAuth, middleware.RateLimit(10, time.Minute))
+	auth.RegisterRoutes(
+		api,
+		authService,
+		jwtAuth,
+		authRateLimit.Middleware("auth:login", middleware.IPKeyExtractor, middleware.EmailKeyExtractor),
+		authRateLimit.Middleware("auth:register", middleware.IPKeyExtractor, middleware.EmailKeyExtractor),
+	)
 
 	admin := api.Group("/admin")
 	admin.Use(jwtAuth, middleware.RequireRole("admin"))

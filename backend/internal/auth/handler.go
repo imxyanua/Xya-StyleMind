@@ -15,11 +15,11 @@ type Handler struct {
 	service *Service
 }
 
-func RegisterRoutes(group *gin.RouterGroup, service *Service, authMiddleware gin.HandlerFunc, rateLimit gin.HandlerFunc) {
+func RegisterRoutes(group *gin.RouterGroup, service *Service, authMiddleware gin.HandlerFunc, loginRateLimit gin.HandlerFunc, registerRateLimit gin.HandlerFunc) {
 	h := &Handler{service: service}
 
-	group.POST("/auth/register", rateLimit, h.Register)
-	group.POST("/auth/login", rateLimit, h.Login)
+	group.POST("/auth/register", registerRateLimit, h.Register)
+	group.POST("/auth/login", loginRateLimit, h.Login)
 	group.GET("/auth/me", authMiddleware, h.Me)
 }
 

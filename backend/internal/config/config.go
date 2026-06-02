@@ -16,6 +16,7 @@ type Config struct {
 	JWTAudience        string
 	CORSAllowedOrigins []string
 	Database           DatabaseConfig
+	Redis              RedisConfig
 }
 
 type DatabaseConfig struct {
@@ -24,6 +25,12 @@ type DatabaseConfig struct {
 	User     string
 	Password string
 	Name     string
+}
+
+type RedisConfig struct {
+	Addr     string
+	Password string
+	DB       string
 }
 
 func Load() Config {
@@ -45,6 +52,11 @@ func Load() Config {
 			User:     getEnv("DB_USER", "postgres"),
 			Password: getEnv("DB_PASSWORD", "postgres"),
 			Name:     getEnv("DB_NAME", "stylemind"),
+		},
+		Redis: RedisConfig{
+			Addr:     getEnv("REDIS_ADDR", ""),
+			Password: getEnv("REDIS_PASSWORD", ""),
+			DB:       getEnv("REDIS_DB", "0"),
 		},
 	}
 

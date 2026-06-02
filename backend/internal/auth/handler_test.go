@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"golang.org/x/crypto/bcrypt"
@@ -17,7 +18,7 @@ func newAuthTestRouter(service *Service) *gin.Engine {
 	router := gin.New()
 	api := router.Group("/api/v1")
 	passThrough := func(c *gin.Context) { c.Next() }
-	RegisterRoutes(api, service, passThrough, passThrough)
+	RegisterRoutes(api, service, passThrough, passThrough, passThrough)
 	return router
 }
 
@@ -74,6 +75,56 @@ func TestHandlerLogin_InvalidCredentialsDoesNotLeakDetails(t *testing.T) {
 	}
 }
 
+func TestHandlerLogin_UsesRateLimiterBeforeHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	api := router.Group("/api/v1")
+	limiterCalled := false
+	blockingLimiter := func(c *gin.Context) {
+		limiterCalled = true
+		c.AbortWithStatus(http.StatusTooManyRequests)
+	}
+	passThrough := func(c *gin.Context) { c.Next() }
+	RegisterRoutes(api, NewService(newFakeUserRepository(), testTokenConfig()), passThrough, blockingLimiter, passThrough)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"email":"user@example.com","password":"password123"}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	if !limiterCalled {
+		t.Fatal("login rate limiter was not called")
+	}
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusTooManyRequests)
+	}
+}
+
+func TestHandlerRegister_UsesRateLimiterBeforeHandler(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	api := router.Group("/api/v1")
+	limiterCalled := false
+	blockingLimiter := func(c *gin.Context) {
+		limiterCalled = true
+		c.AbortWithStatus(http.StatusTooManyRequests)
+	}
+	passThrough := func(c *gin.Context) { c.Next() }
+	RegisterRoutes(api, NewService(newFakeUserRepository(), testTokenConfig()), passThrough, passThrough, blockingLimiter)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{"email":"user@example.com","full_name":"Test User","password":"password123"}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	if !limiterCalled {
+		t.Fatal("register rate limiter was not called")
+	}
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusTooManyRequests)
+	}
+}
+
 func TestHandlerMe_ReturnsAuthenticatedContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -84,7 +135,7 @@ func TestHandlerMe_ReturnsAuthenticatedContext(t *testing.T) {
 		c.Next()
 	}
 	passThrough := func(c *gin.Context) { c.Next() }
-	RegisterRoutes(api, NewService(newFakeUserRepository(), testTokenConfig()), authMiddleware, passThrough)
+	RegisterRoutes(api, NewService(newFakeUserRepository(), testTokenConfig()), authMiddleware, passThrough, passThrough)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
