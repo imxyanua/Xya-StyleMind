@@ -1,0 +1,7 @@
+.env
+bin/
+tmp/
+vendor/
+dist/
+build/
+coverage/

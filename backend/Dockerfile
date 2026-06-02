@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
@@ -12,6 +12,7 @@ FROM alpine:3.20
 
 WORKDIR /app
 COPY --from=builder /stylemind /app/stylemind
+COPY migrations /app/migrations
 
 EXPOSE 8080
 

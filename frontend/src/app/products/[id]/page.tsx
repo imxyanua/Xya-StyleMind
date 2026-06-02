@@ -35,12 +35,13 @@ export default function ProductDetailPage() {
     if (!id) {
       return;
     }
+    const productIdForRequest = id;
 
     async function loadProduct() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetchProductById(id);
+        const response = await fetchProductById(productIdForRequest);
         if (!cancelled) {
           setProduct(response.data ?? null);
         }
@@ -75,6 +76,10 @@ export default function ProductDetailPage() {
   }
 
   async function onAddToCart() {
+    if (!product) {
+      return;
+    }
+
     if (!getToken()) {
       router.push(`/login?redirect=/products/${product.id}`);
       return;
