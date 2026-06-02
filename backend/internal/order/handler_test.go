@@ -6,10 +6,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"stylemind/internal/auth"
 	"stylemind/internal/errs"
+	"stylemind/internal/middleware"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
@@ -24,6 +28,17 @@ func newOrderTestRouter(repo *fakeOrderRepository) *gin.Engine {
 		c.Next()
 	}
 	RegisterRoutes(api, admin, authMiddleware, NewService(repo))
+	return router
+}
+
+func newProtectedOrderTestRouter(repo *fakeOrderRepository, secret string) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	api := router.Group("/api/v1")
+	admin := api.Group("/admin")
+	jwtAuth := middleware.JWTAuth(secret)
+	admin.Use(jwtAuth, middleware.RequireRole("admin"))
+	RegisterRoutes(api, admin, jwtAuth, NewService(repo))
 	return router
 }
 
@@ -115,6 +130,113 @@ func TestHandlerUpdateStatus_InvalidTransition(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assertOrderErrorResponse(t, w, http.StatusBadRequest, "invalid order status transition")
+}
+
+func TestProtectedOrderRoutes_RequireToken(t *testing.T) {
+	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/orders", nil)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusUnauthorized, "unauthorized")
+}
+
+func TestProtectedOrderRoutes_MissingBearerPrefix(t *testing.T) {
+	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
+
+	token, err := auth.GenerateToken("test-secret", "user-1", "user")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/orders", nil)
+	req.Header.Set("Authorization", token)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusUnauthorized, "unauthorized")
+}
+
+func TestProtectedOrderRoutes_WrongSignature(t *testing.T) {
+	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
+
+	token, err := auth.GenerateToken("other-secret", "user-1", "user")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/orders", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusUnauthorized, "unauthorized")
+}
+
+func TestProtectedOrderRoutes_ExpiredToken(t *testing.T) {
+	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, auth.Claims{
+		UserID: "user-1",
+		Role:   "user",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(-time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(time.Now().Add(-time.Hour)),
+		},
+	})
+	tokenString, err := token.SignedString([]byte("test-secret"))
+	if err != nil {
+		t.Fatalf("SignedString error = %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/orders", nil)
+	req.Header.Set("Authorization", "Bearer "+tokenString)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusUnauthorized, "unauthorized")
+}
+
+func TestProtectedAdminOrderStatus_UserForbidden(t *testing.T) {
+	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
+
+	token, err := auth.GenerateToken("test-secret", "user-1", "user")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/orders/"+uuid.NewString()+"/status", bytes.NewBufferString(`{"status":"paid"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusForbidden, "forbidden")
+}
+
+func TestProtectedAdminOrderStatus_AdminAllowed(t *testing.T) {
+	repo := &fakeOrderRepository{}
+	router := newProtectedOrderTestRouter(repo, "test-secret")
+
+	token, err := auth.GenerateToken("test-secret", "admin-1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	orderID := uuid.NewString()
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/admin/orders/"+orderID+"/status", bytes.NewBufferString(`{"status":"paid"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if repo.lastOrderID != orderID || repo.lastStatus != StatusPaid {
+		t.Fatalf("repo update = order:%s status:%s, want %s/%s", repo.lastOrderID, repo.lastStatus, orderID, StatusPaid)
+	}
 }
 
 func assertOrderErrorResponse(t *testing.T, w *httptest.ResponseRecorder, status int, message string) {

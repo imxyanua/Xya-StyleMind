@@ -69,3 +69,11 @@ func TestCORSConfig_UsesConfiguredOrigins(t *testing.T) {
 		t.Fatalf("AllowOrigins[0] = %q, want localhost origin", cfg.AllowOrigins[0])
 	}
 }
+
+func TestCORSConfig_DoesNotAllowCredentials(t *testing.T) {
+	cfg := CORSConfig([]string{"*"})
+
+	if cfg.AllowCredentials {
+		t.Fatal("AllowCredentials = true, want false when wildcard origins are configured")
+	}
+}
