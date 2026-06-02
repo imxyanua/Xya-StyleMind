@@ -70,6 +70,7 @@ func main() {
 	router.Use(
 		middleware.RequestID(),
 		middleware.SecurityHeaders(),
+		middleware.RequestTimeout(time.Duration(cfg.RequestTimeoutSeconds)*time.Second),
 		middleware.RequestLogger(),
 		gin.Recovery(),
 		middleware.RequestBodyLimit(cfg.MaxRequestBodyBytes),

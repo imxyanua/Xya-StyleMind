@@ -142,6 +142,28 @@ func TestRateLimiterUsesIPAndEmailKeys(t *testing.T) {
 	}
 }
 
+func TestRateLimiterUsesRequestContextDeadline(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := &recordingRateLimitStore{}
+	limiter := NewRateLimiter(store, 10, time.Minute)
+	r := gin.New()
+	r.Use(RequestTimeout(time.Second))
+	r.GET("/limited", limiter.Middleware("auth:login", IPKeyExtractor), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/limited", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	if !store.contextHadDeadline {
+		t.Fatal("rate limit store did not receive request context deadline")
+	}
+}
+
 func TestRateLimiterFailClosedOnStoreError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -205,14 +227,18 @@ func (s *failingRateLimitStore) Close() error {
 }
 
 type recordingRateLimitStore struct {
-	mu   sync.Mutex
-	keys []string
+	mu                 sync.Mutex
+	keys               []string
+	contextHadDeadline bool
 }
 
-func (s *recordingRateLimitStore) Increment(_ context.Context, key string, _ time.Duration) (int, error) {
+func (s *recordingRateLimitStore) Increment(ctx context.Context, key string, _ time.Duration) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.keys = append(s.keys, key)
+	if _, ok := ctx.Deadline(); ok {
+		s.contextHadDeadline = true
+	}
 	return 1, nil
 }
 

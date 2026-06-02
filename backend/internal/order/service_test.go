@@ -31,11 +31,13 @@ type fakeOrderRepository struct {
 	listAllLimit           int
 	listAllOffset          int
 	getOrderForUserCalled  bool
+	contextHadDeadline     bool
 	updateOrderStatusCalls int
 }
 
-func (r *fakeOrderRepository) GetOrCreateCart(_ context.Context, userID string) (string, error) {
+func (r *fakeOrderRepository) GetOrCreateCart(ctx context.Context, userID string) (string, error) {
 	r.lastUserID = userID
+	_, r.contextHadDeadline = ctx.Deadline()
 	if r.getOrCreateCartErr != nil {
 		return "", r.getOrCreateCartErr
 	}

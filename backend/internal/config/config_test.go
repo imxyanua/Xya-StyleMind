@@ -8,6 +8,7 @@ func TestLoad_ParsesCORSAllowedOrigins(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test-secret")
 	t.Setenv("JWT_ISSUER", "test-issuer")
 	t.Setenv("JWT_AUDIENCE", "test-audience")
+	t.Setenv("REQUEST_TIMEOUT_SECONDS", "15")
 	t.Setenv("MAX_REQUEST_BODY_BYTES", "2097152")
 
 	cfg := Load()
@@ -23,6 +24,9 @@ func TestLoad_ParsesCORSAllowedOrigins(t *testing.T) {
 	}
 	if cfg.JWTAudience != "test-audience" {
 		t.Fatalf("JWTAudience = %q, want test-audience", cfg.JWTAudience)
+	}
+	if cfg.RequestTimeoutSeconds != 15 {
+		t.Fatalf("RequestTimeoutSeconds = %d, want 15", cfg.RequestTimeoutSeconds)
 	}
 	if cfg.MaxRequestBodyBytes != 2097152 {
 		t.Fatalf("MaxRequestBodyBytes = %d, want 2097152", cfg.MaxRequestBodyBytes)

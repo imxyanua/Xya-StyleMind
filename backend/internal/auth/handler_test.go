@@ -372,6 +372,45 @@ func TestHandlerLogout_RevocationErrorReturnsServiceUnavailable(t *testing.T) {
 	})
 }
 
+func TestHandlerLogout_UsesRequestContextDeadlineForRevocation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := &recordingAuthRevocationStore{}
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), time.Second)
+		defer cancel()
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	})
+	api := router.Group("/api/v1")
+	authMiddleware := func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		c.Set("user_role", "user")
+		c.Set("token_jti", "jti-1")
+		c.Set("token_expires_at", time.Now().Add(time.Hour))
+		c.Next()
+	}
+	passThrough := func(c *gin.Context) { c.Next() }
+	RegisterRoutes(
+		api,
+		NewService(newFakeUserRepository(), testTokenConfig(), WithTokenRevocationStore(store)),
+		authMiddleware,
+		passThrough,
+		passThrough,
+	)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if !store.contextHadDeadline {
+		t.Fatal("revocation store did not receive request context deadline")
+	}
+}
+
 func assertErrorResponse(t *testing.T, w *httptest.ResponseRecorder, status int, message string) {
 	t.Helper()
 
@@ -458,6 +497,23 @@ func (s *failingAuthRevocationStore) IsTokenRevoked(context.Context, string) (bo
 }
 
 func (s *failingAuthRevocationStore) Close() error {
+	return nil
+}
+
+type recordingAuthRevocationStore struct {
+	contextHadDeadline bool
+}
+
+func (s *recordingAuthRevocationStore) RevokeToken(ctx context.Context, _ string, _ time.Duration) error {
+	_, s.contextHadDeadline = ctx.Deadline()
+	return nil
+}
+
+func (s *recordingAuthRevocationStore) IsTokenRevoked(context.Context, string) (bool, error) {
+	return false, nil
+}
+
+func (s *recordingAuthRevocationStore) Close() error {
 	return nil
 }
 

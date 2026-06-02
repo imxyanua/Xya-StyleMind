@@ -10,15 +10,16 @@ import (
 )
 
 type Config struct {
-	AppEnv              string
-	Port                string
-	JWTSecret           string
-	JWTIssuer           string
-	JWTAudience         string
-	MaxRequestBodyBytes int64
-	CORSAllowedOrigins  []string
-	Database            DatabaseConfig
-	Redis               RedisConfig
+	AppEnv                string
+	Port                  string
+	JWTSecret             string
+	JWTIssuer             string
+	JWTAudience           string
+	RequestTimeoutSeconds int64
+	MaxRequestBodyBytes   int64
+	CORSAllowedOrigins    []string
+	Database              DatabaseConfig
+	Redis                 RedisConfig
 }
 
 type DatabaseConfig struct {
@@ -41,19 +42,24 @@ func Load() Config {
 	}
 
 	appEnv := getEnv("APP_ENV", "development")
+	requestTimeoutSeconds, err := parsePositiveInt64(getEnv("REQUEST_TIMEOUT_SECONDS", "10"))
+	if err != nil {
+		log.Fatalf("REQUEST_TIMEOUT_SECONDS must be a positive integer: %v", err)
+	}
 	maxRequestBodyBytes, err := parsePositiveInt64(getEnv("MAX_REQUEST_BODY_BYTES", "1048576"))
 	if err != nil {
 		log.Fatalf("MAX_REQUEST_BODY_BYTES must be a positive integer: %v", err)
 	}
 
 	cfg := Config{
-		AppEnv:              appEnv,
-		Port:                getEnv("PORT", "8080"),
-		JWTSecret:           getEnv("JWT_SECRET", "change-me-in-production"),
-		JWTIssuer:           getEnv("JWT_ISSUER", "stylemind-api"),
-		JWTAudience:         getEnv("JWT_AUDIENCE", "stylemind-web"),
-		MaxRequestBodyBytes: maxRequestBodyBytes,
-		CORSAllowedOrigins:  getEnvList("CORS_ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
+		AppEnv:                appEnv,
+		Port:                  getEnv("PORT", "8080"),
+		JWTSecret:             getEnv("JWT_SECRET", "change-me-in-production"),
+		JWTIssuer:             getEnv("JWT_ISSUER", "stylemind-api"),
+		JWTAudience:           getEnv("JWT_AUDIENCE", "stylemind-web"),
+		RequestTimeoutSeconds: requestTimeoutSeconds,
+		MaxRequestBodyBytes:   maxRequestBodyBytes,
+		CORSAllowedOrigins:    getEnvList("CORS_ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnv("DB_PORT", "5432"),

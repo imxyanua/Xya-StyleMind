@@ -64,6 +64,32 @@ func TestHandlerCheckout_EmptyCart(t *testing.T) {
 	assertOrderErrorResponse(t, w, http.StatusBadRequest, "cart is empty")
 }
 
+func TestHandlerCheckout_PropagatesRequestDeadlineToRepository(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &fakeOrderRepository{}
+	router := gin.New()
+	router.Use(middleware.RequestTimeout(time.Second))
+	api := router.Group("/api/v1")
+	admin := api.Group("/admin")
+	authMiddleware := func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		c.Set("user_role", "user")
+		c.Next()
+	}
+	RegisterRoutes(api, admin, authMiddleware, NewService(repo))
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders", nil)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d, body=%s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	if !repo.contextHadDeadline {
+		t.Fatal("repository did not receive request context deadline")
+	}
+}
+
 func TestHandlerListMine_ReturnsPaginationMeta(t *testing.T) {
 	repo := &fakeOrderRepository{}
 	router := newOrderTestRouter(repo)

@@ -145,6 +145,7 @@ Integration tests are opt-in. If `TEST_DATABASE_URL` is not set, they skip safel
 - Redis is used in production-style deployments for auth rate limiting and JWT `jti` revocation.
 - Logout stores only the token `jti` blacklist key with TTL; raw access tokens are never stored.
 - API responses include baseline security headers, and request bodies are capped by `MAX_REQUEST_BODY_BYTES`.
+- API request contexts have a configurable deadline via `REQUEST_TIMEOUT_SECONDS`.
 
 ### Public Repository Notes
 
@@ -168,6 +169,7 @@ Backend key variables:
 - `JWT_SECRET`
 - `JWT_ISSUER`
 - `JWT_AUDIENCE`
+- `REQUEST_TIMEOUT_SECONDS`
 - `MAX_REQUEST_BODY_BYTES`
 - `REDIS_ADDR`
 - `REDIS_PASSWORD`
