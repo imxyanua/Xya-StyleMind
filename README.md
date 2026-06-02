@@ -146,6 +146,7 @@ Integration tests are opt-in. If `TEST_DATABASE_URL` is not set, they skip safel
 - Logout stores only the token `jti` blacklist key with TTL; raw access tokens are never stored.
 - API responses include baseline security headers, and request bodies are capped by `MAX_REQUEST_BODY_BYTES`.
 - API request contexts have a configurable deadline via `REQUEST_TIMEOUT_SECONDS`.
+- `/metrics` exposes Prometheus-compatible HTTP metrics. In production, keep it behind an internal network or reverse proxy allowlist.
 
 ### Public Repository Notes
 
