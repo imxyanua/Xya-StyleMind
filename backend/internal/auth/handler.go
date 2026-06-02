@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"stylemind/internal/errs"
+	"time"
 
 	"stylemind/pkg/response"
 	"stylemind/pkg/validator"
@@ -21,6 +22,7 @@ func RegisterRoutes(group *gin.RouterGroup, service *Service, authMiddleware gin
 	group.POST("/auth/register", registerRateLimit, h.Register)
 	group.POST("/auth/login", loginRateLimit, h.Login)
 	group.GET("/auth/me", authMiddleware, h.Me)
+	group.POST("/auth/logout", authMiddleware, h.Logout)
 }
 
 func (h *Handler) Register(c *gin.Context) {
@@ -76,4 +78,30 @@ func (h *Handler) Me(c *gin.Context) {
 		"user_id": userID,
 		"role":    role,
 	})
+}
+
+func (h *Handler) Logout(c *gin.Context) {
+	jti := c.GetString("token_jti")
+	expiresAtValue, ok := c.Get("token_expires_at")
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, errs.ErrUnauthorized.Error())
+		return
+	}
+
+	expiresAt, ok := expiresAtValue.(time.Time)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, errs.ErrUnauthorized.Error())
+		return
+	}
+
+	if err := h.service.Logout(c.Request.Context(), jti, expiresAt); err != nil {
+		if errors.Is(err, errs.ErrUnauthorized) {
+			response.Error(c, http.StatusUnauthorized, errs.ErrUnauthorized.Error())
+			return
+		}
+		response.Error(c, http.StatusServiceUnavailable, "logout failed")
+		return
+	}
+
+	response.Success(c, http.StatusOK, "logout success", nil)
 }

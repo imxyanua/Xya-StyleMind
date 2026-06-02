@@ -52,6 +52,17 @@ func main() {
 	}
 	authRateLimit := middleware.NewRateLimiter(rateLimitStore, 10, time.Minute, middleware.WithFailClosed(redisConfigured))
 
+	tokenRevocationStore, tokenRevocationRedisConfigured, err := auth.NewTokenRevocationStoreFromConfig(cfg.Redis.Addr, cfg.Redis.Password, cfg.Redis.DB)
+	if err != nil {
+		log.Fatalf("token revocation store configuration failed: %v", err)
+	}
+	defer tokenRevocationStore.Close()
+	if tokenRevocationRedisConfigured {
+		log.Printf("token revocation using redis at %s", cfg.Redis.Addr)
+	} else {
+		log.Printf("token revocation using in-memory fallback; set REDIS_ADDR for multi-instance deployments")
+	}
+
 	router := gin.New()
 	if err := router.SetTrustedProxies(nil); err != nil {
 		log.Fatalf("failed to configure trusted proxies: %v", err)
@@ -68,8 +79,8 @@ func main() {
 		Audience: cfg.JWTAudience,
 	}
 	authRepo := auth.NewRepository(db)
-	authService := auth.NewService(authRepo, tokenConfig)
-	jwtAuth := middleware.JWTAuth(tokenConfig)
+	authService := auth.NewService(authRepo, tokenConfig, auth.WithTokenRevocationStore(tokenRevocationStore))
+	jwtAuth := middleware.JWTAuth(tokenConfig, middleware.WithTokenRevocationStore(tokenRevocationStore))
 	auth.RegisterRoutes(
 		api,
 		authService,

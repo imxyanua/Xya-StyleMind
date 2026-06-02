@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"stylemind/internal/errs"
 
@@ -166,5 +167,61 @@ func TestServiceLogin_UserNotFound(t *testing.T) {
 	})
 	if !errors.Is(err, errs.ErrInvalidCredentials) {
 		t.Fatalf("err = %v, want ErrInvalidCredentials", err)
+	}
+}
+
+func TestServiceLogout_RevokesTokenUntilExpiry(t *testing.T) {
+	store := NewMemoryTokenRevocationStore()
+	service := NewService(newFakeUserRepository(), testTokenConfig(), WithTokenRevocationStore(store))
+	expiresAt := time.Now().Add(20 * time.Millisecond)
+
+	if err := service.Logout(context.Background(), "jti-1", expiresAt); err != nil {
+		t.Fatalf("Logout error = %v", err)
+	}
+
+	revoked, err := store.IsTokenRevoked(context.Background(), "jti-1")
+	if err != nil {
+		t.Fatalf("IsTokenRevoked error = %v", err)
+	}
+	if !revoked {
+		t.Fatal("token should be revoked before TTL expiry")
+	}
+
+	time.Sleep(30 * time.Millisecond)
+	revoked, err = store.IsTokenRevoked(context.Background(), "jti-1")
+	if err != nil {
+		t.Fatalf("IsTokenRevoked error = %v", err)
+	}
+	if revoked {
+		t.Fatal("token should no longer be revoked after TTL expiry")
+	}
+}
+
+func TestServiceLogout_MissingJTI(t *testing.T) {
+	service := NewService(newFakeUserRepository(), testTokenConfig(), WithTokenRevocationStore(NewMemoryTokenRevocationStore()))
+
+	err := service.Logout(context.Background(), "", time.Now().Add(time.Hour))
+	if !errors.Is(err, errs.ErrUnauthorized) {
+		t.Fatalf("err = %v, want ErrUnauthorized", err)
+	}
+}
+
+func TestNewTokenRevocationStoreFromConfig_UsesMemoryWhenRedisMissing(t *testing.T) {
+	store, redisConfigured, err := NewTokenRevocationStoreFromConfig("", "", "0")
+	if err != nil {
+		t.Fatalf("NewTokenRevocationStoreFromConfig error = %v", err)
+	}
+	if redisConfigured {
+		t.Fatal("redisConfigured = true, want false")
+	}
+	if _, ok := store.(*MemoryTokenRevocationStore); !ok {
+		t.Fatalf("store = %T, want *MemoryTokenRevocationStore", store)
+	}
+}
+
+func TestNewTokenRevocationStoreFromConfig_InvalidRedisDB(t *testing.T) {
+	_, _, err := NewTokenRevocationStoreFromConfig("localhost:6379", "", "bad")
+	if err == nil {
+		t.Fatal("expected error for invalid redis db")
 	}
 }

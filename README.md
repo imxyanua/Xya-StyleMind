@@ -44,7 +44,7 @@ Database migrations are auto-applied at startup by the migration runner.
 
 Current API groups are versioned under `/api/v1`:
 
-- Auth: register, login, current user
+- Auth: register, login, logout, current user
 - Categories: public list + admin create
 - Products: public list/detail + admin CRUD
 - Cart: authenticated user cart operations
@@ -58,9 +58,10 @@ The backend foundation is implemented and ready for feature expansion.
 Implemented:
 
 - JWT authentication and role middleware
+- JWT registered claims validation and Redis-backed token revocation
 - Product/catalog/cart/order flow
 - Auto migration runner
-- Dockerized local development support
+- Dockerized local development support with PostgreSQL and Redis
 
 Planned next:
 
@@ -141,6 +142,8 @@ Integration tests are opt-in. If `TEST_DATABASE_URL` is not set, they skip safel
 - Never commit real `.env` files to the repository.
 - Never commit real API keys, database passwords, JWT secrets, or cloud secrets.
 - If any secret was ever committed, rotate it immediately.
+- Redis is used in production-style deployments for auth rate limiting and JWT `jti` revocation.
+- Logout stores only the token `jti` blacklist key with TTL; raw access tokens are never stored.
 
 ### Public Repository Notes
 

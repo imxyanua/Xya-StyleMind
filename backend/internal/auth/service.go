@@ -5,14 +5,16 @@ import (
 	"errors"
 	"strings"
 	"stylemind/internal/errs"
+	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type Service struct {
-	repo        UserRepository
-	tokenConfig TokenConfig
+	repo            UserRepository
+	tokenConfig     TokenConfig
+	revocationStore TokenRevocationStore
 }
 
 type UserRepository interface {
@@ -21,8 +23,20 @@ type UserRepository interface {
 	GetUserByID(ctx context.Context, id string) (*User, error)
 }
 
-func NewService(repo UserRepository, tokenConfig TokenConfig) *Service {
-	return &Service{repo: repo, tokenConfig: tokenConfig}
+type ServiceOption func(*Service)
+
+func WithTokenRevocationStore(store TokenRevocationStore) ServiceOption {
+	return func(s *Service) {
+		s.revocationStore = store
+	}
+}
+
+func NewService(repo UserRepository, tokenConfig TokenConfig, opts ...ServiceOption) *Service {
+	service := &Service{repo: repo, tokenConfig: tokenConfig}
+	for _, opt := range opts {
+		opt(service)
+	}
+	return service
 }
 
 func (s *Service) Register(ctx context.Context, req RegisterRequest) (map[string]interface{}, error) {
@@ -94,4 +108,19 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (map[string]inter
 			"role":      user.Role,
 		},
 	}, nil
+}
+
+func (s *Service) Logout(ctx context.Context, jti string, expiresAt time.Time) error {
+	if jti == "" {
+		return errs.ErrUnauthorized
+	}
+	if s.revocationStore == nil {
+		return nil
+	}
+
+	ttl := time.Until(expiresAt)
+	if ttl <= 0 {
+		return nil
+	}
+	return s.revocationStore.RevokeToken(ctx, jti, ttl)
 }

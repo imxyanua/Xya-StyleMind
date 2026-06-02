@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -72,6 +74,126 @@ func TestJWTAuth_ValidToken(t *testing.T) {
 	}
 	if body["role"] != "admin" {
 		t.Fatalf("role = %v, want admin", body["role"])
+	}
+}
+
+func TestJWTAuth_ValidTokenWithRevocationStore(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	cfg := middlewareTestTokenConfig()
+	store := auth.NewMemoryTokenRevocationStore()
+
+	r.GET("/protected", JWTAuth(cfg, WithTokenRevocationStore(store)), func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"user_id": c.GetString("user_id"),
+			"jti":     c.GetString("token_jti"),
+		})
+	})
+
+	token, err := auth.GenerateToken(cfg, "u1", "user")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+}
+
+func TestJWTAuth_RevokedToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	cfg := middlewareTestTokenConfig()
+	store := auth.NewMemoryTokenRevocationStore()
+
+	r.GET("/protected", JWTAuth(cfg, WithTokenRevocationStore(store)), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	token, err := auth.GenerateToken(cfg, "u1", "user")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+	claims, err := auth.ParseToken(cfg, token)
+	if err != nil {
+		t.Fatalf("ParseToken error = %v", err)
+	}
+	if err := store.RevokeToken(context.Background(), claims.ID, time.Hour); err != nil {
+		t.Fatalf("RevokeToken error = %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestJWTAuth_RevokedJTIExpires(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	cfg := middlewareTestTokenConfig()
+	store := auth.NewMemoryTokenRevocationStore()
+
+	r.GET("/protected", JWTAuth(cfg, WithTokenRevocationStore(store)), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	token, err := auth.GenerateToken(cfg, "u1", "user")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+	claims, err := auth.ParseToken(cfg, token)
+	if err != nil {
+		t.Fatalf("ParseToken error = %v", err)
+	}
+	if err := store.RevokeToken(context.Background(), claims.ID, 10*time.Millisecond); err != nil {
+		t.Fatalf("RevokeToken error = %v", err)
+	}
+	time.Sleep(20 * time.Millisecond)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+}
+
+func TestJWTAuth_RevocationStoreErrorFailsClosed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	cfg := middlewareTestTokenConfig()
+
+	r.GET("/protected", JWTAuth(cfg, WithTokenRevocationStore(&failingTokenRevocationStore{})), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	token, err := auth.GenerateToken(cfg, "u1", "user")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusUnauthorized)
+	}
+	if w.Body.String() != `{"success":false,"message":"unauthorized"}` {
+		t.Fatalf("body leaked details or had wrong format: %s", w.Body.String())
 	}
 }
 
@@ -170,4 +292,18 @@ func middlewareTestTokenConfig() auth.TokenConfig {
 		Issuer:   "stylemind-api",
 		Audience: "stylemind-web",
 	}
+}
+
+type failingTokenRevocationStore struct{}
+
+func (s *failingTokenRevocationStore) RevokeToken(context.Context, string, time.Duration) error {
+	return errors.New("redis unavailable")
+}
+
+func (s *failingTokenRevocationStore) IsTokenRevoked(context.Context, string) (bool, error) {
+	return false, errors.New("redis unavailable")
+}
+
+func (s *failingTokenRevocationStore) Close() error {
+	return nil
 }
