@@ -62,6 +62,15 @@ func main() {
 	} else {
 		log.Printf("token revocation using in-memory fallback; set REDIS_ADDR for multi-instance deployments")
 	}
+	var redisHealth health.Pinger
+	if redisConfigured {
+		redisChecker, err := health.NewRedisChecker(cfg.Redis)
+		if err != nil {
+			log.Fatalf("redis health checker configuration failed: %v", err)
+		}
+		defer redisChecker.Close()
+		redisHealth = redisChecker
+	}
 
 	router := gin.New()
 	if err := router.SetTrustedProxies(nil); err != nil {
@@ -81,7 +90,7 @@ func main() {
 	httpMetrics.RegisterRoutes(router)
 
 	api := router.Group("/api/v1")
-	health.RegisterRoutes(api, db)
+	health.RegisterRoutes(router, api, health.NewPostgresChecker(db), redisHealth, redisConfigured)
 
 	tokenConfig := auth.TokenConfig{
 		Secret:   cfg.JWTSecret,

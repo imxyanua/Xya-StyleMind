@@ -49,7 +49,7 @@ Current API groups are versioned under `/api/v1`:
 - Products: public list/detail + admin CRUD
 - Cart: authenticated user cart operations
 - Orders: checkout, user order history/detail, admin status update
-- Health: service and DB health check
+- Health: `/healthz`, `/livez`, `/readyz`, and legacy `/api/v1/health`
 
 ### Development Status
 
@@ -99,10 +99,11 @@ cd backend
 go build ./...
 ```
 
-5. Health check:
+5. Health checks:
 
 ```bash
-curl http://localhost:8080/api/v1/health
+curl http://localhost:8080/livez
+curl http://localhost:8080/readyz
 ```
 
 ### Seed Data Notes
@@ -147,6 +148,7 @@ Integration tests are opt-in. If `TEST_DATABASE_URL` is not set, they skip safel
 - API responses include baseline security headers, and request bodies are capped by `MAX_REQUEST_BODY_BYTES`.
 - API request contexts have a configurable deadline via `REQUEST_TIMEOUT_SECONDS`.
 - `/metrics` exposes Prometheus-compatible HTTP metrics. In production, keep it behind an internal network or reverse proxy allowlist.
+- `/readyz` checks Postgres and configured Redis. Docker healthchecks use `/readyz` so the backend is healthy only when dependencies are ready.
 
 ### Public Repository Notes
 
