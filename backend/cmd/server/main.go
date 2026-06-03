@@ -19,6 +19,7 @@ import (
 	"stylemind/internal/middleware"
 	"stylemind/internal/order"
 	"stylemind/internal/product"
+	"stylemind/internal/review"
 	"stylemind/internal/wishlist"
 
 	"github.com/gin-contrib/cors"
@@ -119,6 +120,10 @@ func main() {
 	productRepo := product.NewRepository(db)
 	productService := product.NewService(productRepo)
 	product.RegisterRoutes(api, admin, productService)
+
+	reviewRepo := review.NewRepository(db)
+	reviewService := review.NewService(reviewRepo)
+	review.RegisterRoutes(api, jwtAuth, reviewService)
 
 	cartRepo := cart.NewRepository(db)
 	cartService := cart.NewService(cartRepo)

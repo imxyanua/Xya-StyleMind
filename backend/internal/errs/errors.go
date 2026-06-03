@@ -19,5 +19,8 @@ var (
 	ErrOrderNotFound                = errors.New("order not found")
 	ErrInvalidOrderStatus           = errors.New("invalid order status")
 	ErrInvalidOrderStatusTransition = errors.New("invalid order status transition")
+	ErrReviewNotFound               = errors.New("review not found")
+	ErrReviewAlreadyExists          = errors.New("review already exists")
+	ErrProductNotPurchased          = errors.New("product not purchased")
 	ErrForbidden                    = errors.New("forbidden")
 )
