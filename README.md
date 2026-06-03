@@ -18,6 +18,7 @@ AI-powered fashion ecommerce platform.
 - Product filtering and detail view
 - Shopping cart
 - Checkout and order workflow
+- Wishlist / favorite products
 - Admin routes for management operations
 - Future: AI outfit recommendation
 - Future: Smart search
@@ -49,6 +50,7 @@ Current API groups are versioned under `/api/v1`:
 - Products: public list/detail + admin CRUD
 - Cart: authenticated user cart operations
 - Orders: checkout, user order history/detail, admin status update
+- Wishlist: authenticated user favorite products
 - Health: `/healthz`, `/livez`, `/readyz`, and legacy `/api/v1/health`
 
 ### Development Status
@@ -60,6 +62,7 @@ Implemented:
 - JWT authentication and role middleware
 - JWT registered claims validation and Redis-backed token revocation
 - Product/catalog/cart/order flow
+- Wishlist/favorite product flow
 - Auto migration runner
 - Dockerized local development support with PostgreSQL and Redis
 

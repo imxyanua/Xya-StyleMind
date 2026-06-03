@@ -19,6 +19,7 @@ import (
 	"stylemind/internal/middleware"
 	"stylemind/internal/order"
 	"stylemind/internal/product"
+	"stylemind/internal/wishlist"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -122,6 +123,10 @@ func main() {
 	cartRepo := cart.NewRepository(db)
 	cartService := cart.NewService(cartRepo)
 	cart.RegisterRoutes(api, jwtAuth, cartService)
+
+	wishlistRepo := wishlist.NewRepository(db)
+	wishlistService := wishlist.NewService(wishlistRepo)
+	wishlist.RegisterRoutes(api, jwtAuth, wishlistService)
 
 	orderRepo := order.NewRepository(db)
 	orderService := order.NewService(orderRepo)
