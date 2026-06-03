@@ -23,7 +23,24 @@ type UpdateProductRequest struct {
 }
 
 type ListFilter struct {
+	Query      string
+	CategoryID string
+	MinPrice   *float64
+	MaxPrice   *float64
 	Style      string
 	Color      string
-	CategoryID string
+	MinRating  *float64
+	InStock    *bool
+	Sort       string
+	Page       int
+	Limit      int
+	Offset     int
 }
+
+const (
+	SortNewest     = "newest"
+	SortPriceAsc   = "price_asc"
+	SortPriceDesc  = "price_desc"
+	SortRatingDesc = "rating_desc"
+	SortPopular    = "popular"
+)

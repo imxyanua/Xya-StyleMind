@@ -13,10 +13,11 @@ type Params struct {
 }
 
 type Meta struct {
-	Page      int   `json:"page"`
-	Limit     int   `json:"limit"`
-	Total     int64 `json:"total"`
-	TotalPage int64 `json:"total_page"`
+	Page       int   `json:"page"`
+	Limit      int   `json:"limit"`
+	Total      int64 `json:"total"`
+	TotalPage  int64 `json:"total_page"`
+	TotalPages int64 `json:"total_pages"`
 }
 
 func Parse(c *gin.Context) Params {
@@ -46,10 +47,11 @@ func BuildMeta(page, limit int, total int64) Meta {
 		totalPage++
 	}
 	return Meta{
-		Page:      page,
-		Limit:     limit,
-		Total:     total,
-		TotalPage: totalPage,
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPage:  totalPage,
+		TotalPages: totalPage,
 	}
 }
 

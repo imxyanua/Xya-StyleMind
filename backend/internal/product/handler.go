@@ -3,6 +3,8 @@ package product
 import (
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 	"stylemind/internal/errs"
 
 	"stylemind/pkg/pagination"
@@ -28,22 +30,26 @@ func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, service *Servi
 }
 
 func (h *Handler) List(c *gin.Context) {
-	page := pagination.Parse(c)
-	filter := ListFilter{
-		Style:      c.Query("style"),
-		Color:      c.Query("color"),
-		CategoryID: c.Query("category_id"),
-	}
-	items, total, err := h.service.List(c.Request.Context(), filter, page.Limit, page.Offset)
+	filter, err := parseListFilter(c)
 	if err != nil {
-		if errors.Is(err, errs.ErrInvalidID) {
-			response.Error(c, http.StatusBadRequest, "invalid category_id")
-			return
-		}
-		response.Error(c, http.StatusInternalServerError, "failed to fetch products")
+		response.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	response.SuccessWithMeta(c, http.StatusOK, "ok", items, pagination.BuildMeta(page.Page, page.Limit, total))
+	items, total, err := h.service.List(c.Request.Context(), filter, filter.Limit, filter.Offset)
+	if err != nil {
+		switch {
+		case errors.Is(err, errs.ErrInvalidID):
+			response.Error(c, http.StatusBadRequest, "invalid category_id")
+		case errors.Is(err, errs.ErrInvalidSort):
+			response.Error(c, http.StatusBadRequest, "invalid sort")
+		case errors.Is(err, errs.ErrValidationFailed):
+			response.Error(c, http.StatusBadRequest, "validation failed")
+		default:
+			response.Error(c, http.StatusInternalServerError, "failed to fetch products")
+		}
+		return
+	}
+	response.SuccessWithMeta(c, http.StatusOK, "ok", items, pagination.BuildMeta(filter.Page, filter.Limit, total))
 }
 
 func (h *Handler) GetDetail(c *gin.Context) {
@@ -128,4 +134,87 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 	response.Success(c, http.StatusOK, "product deleted", gin.H{"id": c.Param("id")})
+}
+
+func parseListFilter(c *gin.Context) (ListFilter, error) {
+	page, err := parsePositiveIntQuery(c, "page", 1, 0)
+	if err != nil {
+		return ListFilter{}, err
+	}
+	limit, err := parsePositiveIntQuery(c, "limit", 20, 100)
+	if err != nil {
+		return ListFilter{}, err
+	}
+
+	minPrice, err := parseOptionalNonNegativeFloat(c, "min_price")
+	if err != nil {
+		return ListFilter{}, err
+	}
+	maxPrice, err := parseOptionalNonNegativeFloat(c, "max_price")
+	if err != nil {
+		return ListFilter{}, err
+	}
+	minRating, err := parseOptionalNonNegativeFloat(c, "min_rating")
+	if err != nil {
+		return ListFilter{}, err
+	}
+	inStock, err := parseOptionalBool(c, "in_stock")
+	if err != nil {
+		return ListFilter{}, err
+	}
+
+	sort := strings.TrimSpace(c.DefaultQuery("sort", SortNewest))
+	return ListFilter{
+		Query:      strings.TrimSpace(c.Query("q")),
+		CategoryID: strings.TrimSpace(c.Query("category_id")),
+		MinPrice:   minPrice,
+		MaxPrice:   maxPrice,
+		Style:      strings.TrimSpace(c.Query("style")),
+		Color:      strings.TrimSpace(c.Query("color")),
+		MinRating:  minRating,
+		InStock:    inStock,
+		Sort:       sort,
+		Page:       page,
+		Limit:      limit,
+		Offset:     (page - 1) * limit,
+	}, nil
+}
+
+func parsePositiveIntQuery(c *gin.Context, key string, fallback int, max int) (int, error) {
+	raw := strings.TrimSpace(c.Query(key))
+	if raw == "" {
+		return fallback, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 {
+		return 0, errors.New("invalid " + key)
+	}
+	if max > 0 && value > max {
+		return 0, errors.New("invalid " + key)
+	}
+	return value, nil
+}
+
+func parseOptionalNonNegativeFloat(c *gin.Context, key string) (*float64, error) {
+	raw := strings.TrimSpace(c.Query(key))
+	if raw == "" {
+		return nil, nil
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil || value < 0 {
+		return nil, errors.New("invalid " + key)
+	}
+	return &value, nil
+}
+
+func parseOptionalBool(c *gin.Context, key string) (*bool, error) {
+	raw := strings.TrimSpace(c.Query(key))
+	if raw == "" {
+		return nil, nil
+	}
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return nil, errors.New("invalid " + key)
+	}
+	return &value, nil
 }

@@ -21,6 +21,15 @@ func (s *Service) List(ctx context.Context, filter ListFilter, limit, offset int
 			return nil, 0, errs.ErrInvalidID
 		}
 	}
+	if filter.MinPrice != nil && filter.MaxPrice != nil && *filter.MinPrice > *filter.MaxPrice {
+		return nil, 0, errs.ErrValidationFailed
+	}
+	if filter.MinRating != nil && (*filter.MinRating < 0 || *filter.MinRating > 5) {
+		return nil, 0, errs.ErrValidationFailed
+	}
+	if !isAllowedSort(filter.Sort) {
+		return nil, 0, errs.ErrInvalidSort
+	}
 	return s.repo.List(ctx, filter, limit, offset)
 }
 
@@ -53,4 +62,13 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 		return errs.ErrInvalidID
 	}
 	return s.repo.Delete(ctx, id)
+}
+
+func isAllowedSort(sort string) bool {
+	switch sort {
+	case "", SortNewest, SortPriceAsc, SortPriceDesc, SortRatingDesc, SortPopular:
+		return true
+	default:
+		return false
+	}
 }

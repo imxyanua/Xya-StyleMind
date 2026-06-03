@@ -6,6 +6,7 @@ var (
 	ErrUnauthorized                 = errors.New("unauthorized")
 	ErrInvalidPayload               = errors.New("invalid payload")
 	ErrInvalidID                    = errors.New("invalid id")
+	ErrInvalidSort                  = errors.New("invalid sort")
 	ErrValidationFailed             = errors.New("validation failed")
 	ErrInvalidCredentials           = errors.New("invalid credentials")
 	ErrEmailAlreadyExists           = errors.New("email already exists")
