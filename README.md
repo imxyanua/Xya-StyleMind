@@ -55,6 +55,31 @@ Current API groups are versioned under `/api/v1`:
 - Reviews: verified-purchase product reviews, review list, rating summary
 - Health: `/healthz`, `/livez`, `/readyz`, and legacy `/api/v1/health`
 
+### API Documentation
+
+The backend API contract is documented in OpenAPI format:
+
+- [`docs/openapi.yaml`](docs/openapi.yaml)
+
+Preview locally with Redoc:
+
+```bash
+npx @redocly/cli preview-docs docs/openapi.yaml
+```
+
+Or preview with Swagger UI:
+
+```bash
+docker run --rm -p 8081:8080 -e SWAGGER_JSON=/docs/openapi.yaml -v ${PWD}/docs:/docs swaggerapi/swagger-ui
+```
+
+Notes:
+
+- Examples use placeholder tokens only.
+- Protected routes require `Authorization: Bearer <access_token>`.
+- Admin routes require an authenticated user with role `admin`.
+- `/metrics` uses Prometheus text format and should be protected by internal networking or reverse proxy rules in production.
+
 ### Development Status
 
 The backend foundation is implemented and ready for feature expansion.
@@ -66,15 +91,15 @@ Implemented:
 - Product/catalog/cart/order flow
 - Wishlist/favorite product flow
 - Verified-purchase product review and rating flow
+- Advanced product search/filter/sort with rating-aware listing
 - Auto migration runner
 - Dockerized local development support with PostgreSQL and Redis
 
 Planned next:
 
-- Wishlist
+- Frontend product search/filter integration
+- Frontend UI polish
 - AI recommendation
-- Smart search
-- Frontend integration hardening
 
 ### How To Run Locally
 

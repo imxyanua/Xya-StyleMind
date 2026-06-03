@@ -1,0 +1,1871 @@
+﻿openapi: 3.0.3
+info:
+  title: Xya-StyleMind Backend API
+  version: 0.1.0
+  description: |
+    OpenAPI contract for the Xya-StyleMind Go/Gin backend.
+
+    All JSON API endpoints use the shared response shape:
+    `{ success, message, data, meta }`.
+
+    Authentication uses Bearer JWT access tokens. Admin endpoints require an
+    authenticated user with role `admin`.
+servers:
+  - url: http://localhost:8080
+    description: Local backend
+  - url: http://localhost:8080/api/v1
+    description: Local API v1 base path
+tags:
+  - name: Auth
+  - name: Categories
+  - name: Products
+  - name: Cart
+  - name: Orders
+  - name: Wishlist
+  - name: Reviews
+  - name: Health
+  - name: Metrics
+security: []
+paths:
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      description: Public endpoint. Rate limited by IP and email.
+      operationId: register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              default:
+                value:
+                  email: user@example.com
+                  full_name: Linh Nguyen
+                  password: strongPassword123
+      responses:
+        '201':
+          description: Register success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponseEnvelope'
+              examples:
+                default:
+                  value:
+                    success: true
+                    message: register success
+                    data:
+                      token: eyJhbGciOi...example
+                      user:
+                        id: 5c3eb7aa-a3b8-4f1f-a9d4-1e4e4e2db222
+                        email: user@example.com
+                        full_name: Linh Nguyen
+                        role: user
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/products/{product_id}/reviews:
+    get:
+      tags: [Reviews]
+      summary: List product reviews
+      operationId: listProductReviews
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ProductIDPathProductID'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Product reviews
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewListResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Reviews]
+      summary: Create product review
+      description: Protected endpoint. User must have purchased the product. One review per user/product.
+      operationId: createReview
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductIDPathProductID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewRequest'
+            examples:
+              default:
+                value:
+                  order_id: 3d63c26a-7e3e-4b87-8457-3e04ce1df655
+                  rating: 5
+                  comment: Great quality and fit.
+      responses:
+        '201':
+          description: Review created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/products/{product_id}/rating-summary:
+    get:
+      tags: [Reviews]
+      summary: Get product rating summary
+      operationId: getRatingSummary
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ProductIDPathProductID'
+      responses:
+        '200':
+          description: Rating summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RatingSummaryResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/reviews/{id}:
+    patch:
+      tags: [Reviews]
+      summary: Update current user's review
+      operationId: updateReview
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ReviewIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReviewRequest'
+      responses:
+        '200':
+          description: Review updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Reviews]
+      summary: Delete current user's review
+      operationId: deleteReview
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ReviewIDPath'
+      responses:
+        '200':
+          description: Review deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IDResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /health:
+    get:
+      tags: [Health]
+      summary: Lightweight health check
+      operationId: healthLegacyRoot
+      security: []
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthOK'
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Lightweight health check
+      operationId: healthz
+      security: []
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthOK'
+  /livez:
+    get:
+      tags: [Health]
+      summary: Liveness check
+      operationId: livez
+      security: []
+      responses:
+        '200':
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivenessResponseEnvelope'
+  /readyz:
+    get:
+      tags: [Health]
+      summary: Readiness check
+      operationId: readyz
+      security: []
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponseEnvelope'
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponseEnvelope'
+  /api/v1/health:
+    get:
+      tags: [Health]
+      summary: Backward-compatible API health check
+      operationId: apiHealth
+      security: []
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthOK'
+  /metrics:
+    get:
+      tags: [Metrics]
+      summary: Prometheus metrics
+      description: Public in local/dev. In production, expose only via internal network or reverse proxy allowlist.
+      operationId: metrics
+      security: []
+      responses:
+        '200':
+          description: Prometheus text exposition format
+          content:
+            text/plain:
+              schema:
+                type: string
+              examples:
+                default:
+                  value: |
+                    # HELP http_requests_total Total HTTP requests.
+                    # TYPE http_requests_total counter
+                    http_requests_total{method="GET",route="/api/v1/products",status="200"} 1
+  /api/v1/cart:
+    get:
+      tags: [Cart]
+      summary: Get current user's cart
+      operationId: getCart
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/cart/items:
+    post:
+      tags: [Cart]
+      summary: Add product to cart
+      operationId: addCartItem
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+            examples:
+              default:
+                value:
+                  product_id: 29711c9a-5f7d-4ddf-ad71-07d740f398db
+                  quantity: 2
+      responses:
+        '200':
+          description: Cart updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/cart/items/{id}:
+    put:
+      tags: [Cart]
+      summary: Update cart item quantity
+      operationId: updateCartItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCartItemRequest'
+      responses:
+        '200':
+          description: Cart updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Cart]
+      summary: Remove cart item
+      operationId: deleteCartItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Cart updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/orders:
+    post:
+      tags: [Orders]
+      summary: Checkout current cart into an order
+      operationId: checkout
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      tags: [Orders]
+      summary: List current user's orders
+      operationId: listMyOrders
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: User orders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Get one of the current user's orders
+      operationId: getMyOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIDPath'
+      responses:
+        '200':
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/orders:
+    get:
+      tags: [Orders]
+      summary: List all orders
+      description: Admin only.
+      operationId: listAdminOrders
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: All orders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Get any order
+      description: Admin only.
+      operationId: getAdminOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIDPath'
+      responses:
+        '200':
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/orders/{id}/status:
+    put:
+      tags: [Orders]
+      summary: Update order status
+      description: Admin only. Allowed statuses are pending, paid, shipping, completed, cancelled.
+      operationId: updateOrderStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderStatusRequest'
+            examples:
+              default:
+                value:
+                  status: paid
+      responses:
+        '200':
+          description: Order status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/wishlist:
+    get:
+      tags: [Wishlist]
+      summary: List current user's wishlist
+      operationId: listWishlist
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Wishlist items
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WishlistResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/wishlist/products/{product_id}:
+    post:
+      tags: [Wishlist]
+      summary: Add product to wishlist
+      description: Idempotent; adding the same product again returns success and does not duplicate rows.
+      operationId: addWishlistProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductIDPathProductID'
+      responses:
+        '200':
+          description: Wishlist product added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductIDResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Wishlist]
+      summary: Remove product from wishlist
+      description: Idempotent; removing a missing wishlist product still returns success.
+      operationId: removeWishlistProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductIDPathProductID'
+      responses:
+        '200':
+          description: Wishlist product removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductIDResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login and receive an access token
+      description: Public endpoint. Rate limited by IP and email.
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              default:
+                value:
+                  email: user@example.com
+                  password: strongPassword123
+      responses:
+        '200':
+          description: Login success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout current token
+      description: Protected endpoint. Stores the token jti in the revocation store until token expiry.
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NullableSuccessEnvelope'
+              examples:
+                default:
+                  value:
+                    success: true
+                    message: logout success
+                    data: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current authenticated principal
+      operationId: me
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current principal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponseEnvelope'
+              examples:
+                default:
+                  value:
+                    success: true
+                    message: authorized
+                    data:
+                      user_id: 5c3eb7aa-a3b8-4f1f-a9d4-1e4e4e2db222
+                      role: user
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/categories:
+    get:
+      tags: [Categories]
+      summary: List categories
+      operationId: listCategories
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Category list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryListResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/categories:
+    post:
+      tags: [Categories]
+      summary: Create category
+      description: Admin only.
+      operationId: createCategory
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCategoryRequest'
+            examples:
+              default:
+                value:
+                  name: Streetwear
+                  slug: streetwear
+      responses:
+        '201':
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/products:
+    get:
+      tags: [Products]
+      summary: List/search/filter products
+      operationId: listProducts
+      security: []
+      parameters:
+        - name: q
+          in: query
+          description: Keyword search across product name and description.
+          schema:
+            type: string
+          example: hoodie
+        - name: category_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: min_price
+          in: query
+          schema:
+            type: number
+            minimum: 0
+          example: 100000
+        - name: max_price
+          in: query
+          schema:
+            type: number
+            minimum: 0
+          example: 800000
+        - name: style
+          in: query
+          schema:
+            type: string
+          example: streetwear
+        - name: color
+          in: query
+          schema:
+            type: string
+          example: black
+        - name: min_rating
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 5
+          example: 4
+        - name: in_stock
+          in: query
+          schema:
+            type: boolean
+          example: true
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, price_asc, price_desc, rating_desc, popular]
+            default: newest
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Product list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponseEnvelope'
+              examples:
+                default:
+                  value:
+                    success: true
+                    message: ok
+                    data:
+                      - id: 29711c9a-5f7d-4ddf-ad71-07d740f398db
+                        name: Black Street Hoodie
+                        description: Oversized cotton hoodie
+                        price: 300000
+                        stock: 10
+                        category_id: 8a51a2e7-c1f6-44e1-a5b1-5069e9bb241e
+                        style: streetwear
+                        color: black
+                        image_url: https://example.com/hoodie.jpg
+                        average_rating: 4.5
+                        review_count: 2
+                        created_at: '2026-06-03T10:00:00Z'
+                        updated_at: '2026-06-03T10:00:00Z'
+                    meta:
+                      page: 1
+                      limit: 20
+                      total: 1
+                      total_page: 1
+                      total_pages: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/products/{id}:
+    get:
+      tags: [Products]
+      summary: Get product detail
+      operationId: getProduct
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ProductIDPath'
+      responses:
+        '200':
+          description: Product detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/products:
+    post:
+      tags: [Products]
+      summary: Create product
+      description: Admin only.
+      operationId: createProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductMutationRequest'
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/products/{id}:
+    put:
+      tags: [Products]
+      summary: Update product
+      description: Admin only.
+      operationId: updateProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductMutationRequest'
+      responses:
+        '200':
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Products]
+      summary: Delete product
+      description: Admin only.
+      operationId: deleteProduct
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProductIDPath'
+      responses:
+        '200':
+          description: Product deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IDResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      example: 1
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      example: 20
+    ProductIDPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ProductIDPathProductID:
+      name: product_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OrderIDPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReviewIDPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    BadRequest:
+      description: Invalid payload, validation error, or invalid identifier/filter.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                success: false
+                message: validation failed
+    Unauthorized:
+      description: Missing, invalid, expired, or revoked Bearer token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                success: false
+                message: unauthorized
+    Forbidden:
+      description: Authenticated user does not have permission for this resource/action.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                success: false
+                message: forbidden
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                success: false
+                message: not found
+    Conflict:
+      description: Business conflict, such as duplicate product review.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                success: false
+                message: review already exists
+    TooManyRequests:
+      description: Rate limit exceeded.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                success: false
+                message: too many requests
+    InternalServerError:
+      description: Unexpected server error. Response does not expose internal SQL/stack details.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                success: false
+                message: internal server error
+    ServiceUnavailable:
+      description: Dependency unavailable or revocation store unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                success: false
+                message: logout failed
+    HealthOK:
+      description: Health check OK
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HealthResponseEnvelope'
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: validation failed
+    PaginationMeta:
+      type: object
+      required: [page, limit, total, total_page, total_pages]
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          format: int64
+          example: 42
+        total_page:
+          type: integer
+          format: int64
+          description: Backward-compatible pagination field.
+          example: 3
+        total_pages:
+          type: integer
+          format: int64
+          example: 3
+    RegisterRequest:
+      type: object
+      required: [email, full_name, password]
+      properties:
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+    AuthUser:
+      type: object
+      required: [id, email, full_name, role]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+    AuthData:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          description: JWT access token. Examples use placeholders only.
+          example: eyJhbGciOi...example
+        user:
+          $ref: '#/components/schemas/AuthUser'
+    AuthResponseEnvelope:
+      type: object
+      required: [success, message, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: login success
+        data:
+          $ref: '#/components/schemas/AuthData'
+    MeData:
+      type: object
+      required: [user_id, role]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, admin]
+    MeResponseEnvelope:
+      type: object
+      required: [success, message, data]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+          example: authorized
+        data:
+          $ref: '#/components/schemas/MeData'
+    NullableSuccessEnvelope:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: ok
+        data:
+          nullable: true
+    Category:
+      type: object
+      required: [id, name, slug, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateCategoryRequest:
+      type: object
+      required: [name, slug]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        slug:
+          type: string
+          minLength: 2
+          maxLength: 100
+    CategoryResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/Category'
+    CategoryListResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    Product:
+      type: object
+      required: [id, name, description, price, stock, category_id, style, color, image_url, average_rating, review_count, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+          format: double
+          example: 300000
+        stock:
+          type: integer
+          minimum: 0
+        category_id:
+          type: string
+          format: uuid
+        style:
+          type: string
+          example: streetwear
+        color:
+          type: string
+          example: black
+        image_url:
+          type: string
+          format: uri
+        average_rating:
+          type: number
+          format: double
+          example: 4.5
+        review_count:
+          type: integer
+          format: int64
+          example: 2
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ProductMutationRequest:
+      type: object
+      required: [name, description, price, stock, category_id, style, color, image_url]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 255
+        description:
+          type: string
+          minLength: 5
+          maxLength: 5000
+        price:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          example: 300000
+        stock:
+          type: integer
+          minimum: 0
+        category_id:
+          type: string
+          format: uuid
+        style:
+          type: string
+          minLength: 2
+          maxLength: 100
+        color:
+          type: string
+          minLength: 2
+          maxLength: 100
+        image_url:
+          type: string
+          format: uri
+    ProductResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/Product'
+    ProductListResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    CartProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        price:
+          type: number
+        stock:
+          type: integer
+        image_url:
+          type: string
+          format: uri
+        style:
+          type: string
+        color:
+          type: string
+    CartItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        product:
+          $ref: '#/components/schemas/CartProduct'
+        quantity:
+          type: integer
+          minimum: 1
+        subtotal:
+          type: number
+    Cart:
+      type: object
+      properties:
+        cart_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+        total:
+          type: number
+    AddCartItemRequest:
+      type: object
+      required: [product_id, quantity]
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+    UpdateCartItemRequest:
+      type: object
+      required: [quantity]
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+    CartResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/Cart'
+    OrderProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        image_url:
+          type: string
+          format: uri
+        style:
+          type: string
+        color:
+          type: string
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+        unit_price:
+          type: number
+        subtotal:
+          type: number
+        product:
+          $ref: '#/components/schemas/OrderProduct'
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, paid, shipping, completed, cancelled]
+        total_amount:
+          type: number
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UpdateOrderStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [pending, paid, shipping, completed, cancelled]
+    OrderResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/Order'
+    OrderListResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Order'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    WishlistProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        stock:
+          type: integer
+        category_id:
+          type: string
+          format: uuid
+        style:
+          type: string
+        color:
+          type: string
+        image_url:
+          type: string
+          format: uri
+    WishlistItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        product:
+          $ref: '#/components/schemas/WishlistProduct'
+        created_at:
+          type: string
+          format: date-time
+    WishlistResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WishlistItem'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    Review:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+          maxLength: 1000
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateReviewRequest:
+      type: object
+      required: [order_id, rating]
+      properties:
+        order_id:
+          type: string
+          format: uuid
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+          maxLength: 1000
+    UpdateReviewRequest:
+      type: object
+      required: [rating]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+          maxLength: 1000
+    ReviewResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/Review'
+    ReviewListResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Review'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    RatingSummary:
+      type: object
+      properties:
+        average_rating:
+          type: number
+          format: double
+          example: 4.5
+        review_count:
+          type: integer
+          format: int64
+          example: 12
+        rating_breakdown:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          example:
+            '1': 0
+            '2': 1
+            '3': 2
+            '4': 4
+            '5': 5
+    RatingSummaryResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/RatingSummary'
+    IDResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+    ProductIDResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            product_id:
+              type: string
+              format: uuid
+    HealthData:
+      type: object
+      properties:
+        status:
+          type: string
+          example: up
+        service:
+          type: string
+          example: stylemind-backend
+    HealthResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: '#/components/schemas/HealthData'
+    LivenessData:
+      type: object
+      properties:
+        status:
+          type: string
+          example: up
+    LivenessResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: '#/components/schemas/LivenessData'
+    DependencyStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [up, down, skipped]
+    ReadinessData:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+        dependencies:
+          type: object
+          properties:
+            postgres:
+              $ref: '#/components/schemas/DependencyStatus'
+            redis:
+              $ref: '#/components/schemas/DependencyStatus'
+    ReadinessResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ReadinessData'
