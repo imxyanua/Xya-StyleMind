@@ -1,7 +1,3 @@
-export type Category = {
-  id: string;
-  name: string;
-  slug: string;
-  created_at: string;
-  updated_at: string;
-};
+import type { components } from "@/types/openapi";
+
+export type Category = components["schemas"]["Category"];

@@ -1,9 +1,6 @@
-export type PaginationMeta = {
-  page: number;
-  limit: number;
-  total: number;
-  total_page: number;
-};
+import type { components } from "@/types/openapi";
+
+export type PaginationMeta = components["schemas"]["PaginationMeta"];
 
 export type ApiResponse<T> = {
   success: boolean;

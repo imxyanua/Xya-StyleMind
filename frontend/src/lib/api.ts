@@ -1,6 +1,7 @@
 import { ApiError, type ApiResponse } from "@/types/api";
 import type { Cart } from "@/types/cart";
 import type { Category } from "@/types/category";
+import type { components, operations } from "@/types/openapi";
 import type { Order } from "@/types/order";
 import type { Product } from "@/types/product";
 
@@ -56,26 +57,18 @@ export async function apiRequest<T>(
   return payload;
 }
 
-type ProductListParams = {
-  style?: string;
-  color?: string;
-  page?: number;
-  limit?: number;
-};
+export type ProductListParams = NonNullable<
+  operations["listProducts"]["parameters"]["query"]
+>;
 
 export async function fetchProducts(params: ProductListParams = {}) {
   const searchParams = new URLSearchParams();
-  if (params.style) {
-    searchParams.set("style", params.style);
-  }
-  if (params.color) {
-    searchParams.set("color", params.color);
-  }
-  if (params.page) {
-    searchParams.set("page", String(params.page));
-  }
-  if (params.limit) {
-    searchParams.set("limit", String(params.limit));
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+    searchParams.set(key, String(value));
   }
 
   const query = searchParams.toString();
@@ -94,16 +87,7 @@ export async function fetchCategories() {
   return apiRequest<Category[]>("/categories?limit=100", { method: "GET" }, { auth: false });
 }
 
-export type ProductInput = {
-  name: string;
-  description: string;
-  price: number;
-  stock: number;
-  category_id: string;
-  style: string;
-  color: string;
-  image_url: string;
-};
+export type ProductInput = components["schemas"]["ProductMutationRequest"];
 
 export async function createCategory(input: { name: string; slug: string }) {
   return apiRequest<Category>("/admin/categories", {
