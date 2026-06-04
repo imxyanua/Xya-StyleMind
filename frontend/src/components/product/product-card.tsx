@@ -3,11 +3,15 @@ import Image from "next/image";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { WishlistButton } from "@/components/wishlist/wishlist-button";
 import type { Product } from "@/types/product";
 
 type ProductCardProps = {
   product: Product;
   categoryName?: string;
+  wishlisted?: boolean;
+  wishlistLoading?: boolean;
+  onToggleWishlist?: (productId: string) => void;
 };
 
 function formatVND(value: number) {
@@ -17,7 +21,13 @@ function formatVND(value: number) {
   }).format(value);
 }
 
-export function ProductCard({ product, categoryName }: ProductCardProps) {
+export function ProductCard({
+  product,
+  categoryName,
+  wishlisted = false,
+  wishlistLoading = false,
+  onToggleWishlist,
+}: ProductCardProps) {
   const hasRating = product.review_count > 0;
   const inStock = product.stock > 0;
 
@@ -41,6 +51,14 @@ export function ProductCard({ product, categoryName }: ProductCardProps) {
             </Badge>
           ) : null}
         </div>
+        {onToggleWishlist ? (
+          <WishlistButton
+            active={wishlisted}
+            loading={wishlistLoading}
+            onToggle={() => onToggleWishlist(product.id)}
+            className="absolute right-3 top-3 bg-background/90"
+          />
+        ) : null}
       </div>
       <CardHeader className="space-y-2">
         <CardTitle className="line-clamp-2">{product.name}</CardTitle>

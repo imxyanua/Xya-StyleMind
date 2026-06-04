@@ -28,6 +28,9 @@ export default function RootLayout({
               <Link href="/cart" className="hover:underline">
                 Cart
               </Link>
+              <Link href="/wishlist" className="hover:underline">
+                Wishlist
+              </Link>
               <Link href="/orders" className="hover:underline">
                 Orders
               </Link>

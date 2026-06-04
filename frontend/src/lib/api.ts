@@ -4,6 +4,8 @@ import type { Category } from "@/types/category";
 import type { components, operations } from "@/types/openapi";
 import type { Order } from "@/types/order";
 import type { Product } from "@/types/product";
+import type { RatingSummary, Review } from "@/types/review";
+import type { WishlistItem } from "@/types/wishlist";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
@@ -112,6 +114,80 @@ export async function updateProduct(id: string, input: ProductInput) {
 
 export async function deleteProduct(id: string) {
   return apiRequest<{ id: string }>(`/admin/products/${id}`, { method: "DELETE" });
+}
+
+export type ReviewListParams = NonNullable<
+  operations["listProductReviews"]["parameters"]["query"]
+>;
+export type CreateReviewInput = components["schemas"]["CreateReviewRequest"];
+export type UpdateReviewInput = components["schemas"]["UpdateReviewRequest"];
+
+export async function fetchProductReviews(productId: string, params: ReviewListParams = {}) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined) {
+      continue;
+    }
+    searchParams.set(key, String(value));
+  }
+  const query = searchParams.toString();
+  return apiRequest<Review[]>(
+    `/products/${productId}/reviews${query ? `?${query}` : ""}`,
+    { method: "GET" },
+    { auth: false }
+  );
+}
+
+export async function fetchRatingSummary(productId: string) {
+  return apiRequest<RatingSummary>(
+    `/products/${productId}/rating-summary`,
+    { method: "GET" },
+    { auth: false }
+  );
+}
+
+export async function createReview(productId: string, input: CreateReviewInput) {
+  return apiRequest<Review>(`/products/${productId}/reviews`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateReview(id: string, input: UpdateReviewInput) {
+  return apiRequest<Review>(`/reviews/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteReview(id: string) {
+  return apiRequest<{ id: string }>(`/reviews/${id}`, { method: "DELETE" });
+}
+
+export type WishlistListParams = NonNullable<operations["listWishlist"]["parameters"]["query"]>;
+
+export async function fetchWishlist(params: WishlistListParams = {}) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined) {
+      continue;
+    }
+    searchParams.set(key, String(value));
+  }
+  const query = searchParams.toString();
+  return apiRequest<WishlistItem[]>(`/wishlist${query ? `?${query}` : ""}`, { method: "GET" });
+}
+
+export async function addWishlistProduct(productId: string) {
+  return apiRequest<{ product_id: string }>(`/wishlist/products/${productId}`, {
+    method: "POST",
+  });
+}
+
+export async function removeWishlistProduct(productId: string) {
+  return apiRequest<{ product_id: string }>(`/wishlist/products/${productId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function addToCart(productId: string, quantity: number) {

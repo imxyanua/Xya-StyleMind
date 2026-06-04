@@ -7,8 +7,16 @@ import { ProductCard } from "@/components/product/product-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { fetchCategories, fetchProducts, type ProductListParams } from "@/lib/api";
-import type { PaginationMeta } from "@/types/api";
+import {
+  addWishlistProduct,
+  fetchCategories,
+  fetchProducts,
+  fetchWishlist,
+  removeWishlistProduct,
+  type ProductListParams,
+} from "@/lib/api";
+import { getToken } from "@/lib/auth";
+import { ApiError, type PaginationMeta } from "@/types/api";
 import type { Category } from "@/types/category";
 import type { Product } from "@/types/product";
 
@@ -114,6 +122,9 @@ function ProductsBrowser() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [wishlistedProductIds, setWishlistedProductIds] = useState<Set<string>>(new Set());
+  const [wishlistBusyId, setWishlistBusyId] = useState<string | null>(null);
+  const [wishlistError, setWishlistError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -141,14 +152,33 @@ function ProductsBrowser() {
       setLoading(true);
       setError(null);
       try {
+        const token = getToken();
         const [productResponse, categoryResponse] = await Promise.all([
           fetchProducts(queryParams),
           fetchCategories(),
         ]);
+
+        let wishlistIds = new Set<string>();
+        if (token) {
+          try {
+            const wishlistResponse = await fetchWishlist({ limit: 100 });
+            wishlistIds = new Set(
+              (wishlistResponse.data ?? [])
+                .map((item) => item.product_id)
+                .filter((id): id is string => Boolean(id))
+            );
+          } catch (err) {
+            if (!(err instanceof ApiError && err.status === 401)) {
+              setWishlistError("Could not sync wishlist state.");
+            }
+          }
+        }
+
         if (!cancelled) {
           setProducts(productResponse.data ?? []);
           setMeta(productResponse.meta ?? null);
           setCategories(categoryResponse.data ?? []);
+          setWishlistedProductIds(wishlistIds);
         }
       } catch (err) {
         if (!cancelled) {
@@ -168,6 +198,51 @@ function ProductsBrowser() {
       cancelled = true;
     };
   }, [queryParams]);
+
+  async function toggleWishlist(productId: string) {
+    if (!getToken()) {
+      router.push(`/login?redirect=/products${canonicalQuery ? `?${canonicalQuery}` : ""}`);
+      return;
+    }
+
+    const wasWishlisted = wishlistedProductIds.has(productId);
+    setWishlistBusyId(productId);
+    setWishlistError(null);
+    setWishlistedProductIds((prev) => {
+      const next = new Set(prev);
+      if (wasWishlisted) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+      }
+      return next;
+    });
+
+    try {
+      if (wasWishlisted) {
+        await removeWishlistProduct(productId);
+      } else {
+        await addWishlistProduct(productId);
+      }
+    } catch (err) {
+      setWishlistedProductIds((prev) => {
+        const next = new Set(prev);
+        if (wasWishlisted) {
+          next.add(productId);
+        } else {
+          next.delete(productId);
+        }
+        return next;
+      });
+      if (err instanceof ApiError && err.status === 401) {
+        router.push(`/login?redirect=/products${canonicalQuery ? `?${canonicalQuery}` : ""}`);
+        return;
+      }
+      setWishlistError(err instanceof Error ? err.message : "Could not update wishlist.");
+    } finally {
+      setWishlistBusyId(null);
+    }
+  }
 
   const categoryById = useMemo(() => {
     return new Map(categories.map((category) => [category.id, category.name]));
@@ -414,6 +489,12 @@ function ProductsBrowser() {
             </Card>
           ) : null}
 
+          {wishlistError ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              {wishlistError}
+            </p>
+          ) : null}
+
           {loading ? (
             <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, index) => (
@@ -449,6 +530,9 @@ function ProductsBrowser() {
                     key={product.id}
                     product={product}
                     categoryName={categoryById.get(product.category_id)}
+                    wishlisted={wishlistedProductIds.has(product.id)}
+                    wishlistLoading={wishlistBusyId === product.id}
+                    onToggleWishlist={toggleWishlist}
                   />
                 ))}
               </div>
