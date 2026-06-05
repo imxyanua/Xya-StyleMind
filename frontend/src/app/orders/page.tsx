@@ -73,47 +73,84 @@ export default function OrdersPage() {
   const totalPages = useMemo(() => meta?.total_page ?? 1, [meta]);
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading orders...</p>;
+    return (
+      <div className="grid gap-4">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="h-40 animate-pulse rounded-[1.5rem] bg-muted/80" />
+        ))}
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">My Orders</h1>
+    <div className="space-y-7">
+      <div className="surface-card flex flex-col gap-4 rounded-[2rem] p-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="eyebrow">Order history</p>
+          <h1 className="mt-2 text-4xl font-semibold">My Orders</h1>
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+            Track checkout results, review purchased products, and inspect order status.
+          </p>
+        </div>
         <Button variant="outline" asChild>
           <Link href="/products">Shop more</Link>
         </Button>
       </div>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? (
+        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
 
       {!error && orders.length === 0 ? (
-        <Card>
-          <CardContent className="py-8">
-            <p className="text-sm text-muted-foreground">No orders yet.</p>
+        <Card className="surface-card">
+          <CardContent className="state-panel">
+            <p className="text-xl font-semibold">No orders yet.</p>
+            <p className="max-w-md text-sm text-muted-foreground">
+              Checkout from your cart to see order history here.
+            </p>
+            <Button asChild>
+              <Link href="/products">Start shopping</Link>
+            </Button>
           </CardContent>
         </Card>
       ) : null}
 
       <div className="space-y-4">
         {orders.map((order) => (
-          <Card key={order.id}>
+          <Card key={order.id} className="surface-card rounded-[1.5rem]">
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <CardTitle className="text-base">Order #{order.id.slice(0, 8)}</CardTitle>
-                <Badge variant="secondary">{order.status}</Badge>
+                <div>
+                  <CardTitle className="text-xl">Order #{order.id.slice(0, 8)}</CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Created: {formatDate(order.created_at)}
+                  </p>
+                </div>
+                <Badge variant="secondary" className="capitalize">
+                  {order.status}
+                </Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Created: {formatDate(order.created_at)}
-              </p>
-              <p className="font-medium">Total: {formatVND(order.total_amount)}</p>
-              <div className="space-y-1 text-sm">
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between rounded-2xl bg-muted/60 p-4">
+                <span className="text-sm text-muted-foreground">Total paid</span>
+                <span className="font-heading text-2xl font-semibold">
+                  {formatVND(order.total_amount)}
+                </span>
+              </div>
+              <div className="grid gap-2 text-sm">
                 {order.items.map((item) => (
-                  <p key={item.id}>
-                    {item.quantity} x {item.product.name} ({formatVND(item.unit_price)})
-                  </p>
+                  <div
+                    key={item.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/70 px-3 py-2"
+                  >
+                    <span>
+                      {item.quantity} x {item.product.name}
+                    </span>
+                    <span className="font-medium">{formatVND(item.unit_price)}</span>
+                  </div>
                 ))}
               </div>
             </CardContent>
@@ -122,7 +159,7 @@ export default function OrdersPage() {
       </div>
 
       {orders.length > 0 ? (
-        <div className="flex items-center justify-between">
+        <div className="surface-card flex items-center justify-between rounded-[1.5rem] p-4">
           <p className="text-sm text-muted-foreground">
             Page {meta?.page ?? 1} / {totalPages}
           </p>

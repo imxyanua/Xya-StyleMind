@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { addToCart, fetchWishlist, removeWishlistProduct } from "@/lib/api";
@@ -104,15 +105,22 @@ export default function WishlistPage() {
   }
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading wishlist...</p>;
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div key={index} className="h-80 animate-pulse rounded-[1.5rem] bg-muted/80" />
+        ))}
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-7">
+      <div className="surface-card flex flex-col gap-4 rounded-[2rem] p-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Wishlist</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="eyebrow">Saved edit</p>
+          <h1 className="mt-2 text-4xl font-semibold">Wishlist</h1>
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
             Save products you want to compare, style, or buy later.
           </p>
         </div>
@@ -121,12 +129,16 @@ export default function WishlistPage() {
         </Button>
       </div>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? (
+        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
 
       {items.length === 0 ? (
-        <Card>
-          <CardContent className="flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center">
-            <p className="text-lg font-semibold">Your wishlist is empty.</p>
+        <Card className="surface-card">
+          <CardContent className="state-panel">
+            <p className="text-xl font-semibold">Your wishlist is empty.</p>
             <p className="max-w-md text-sm text-muted-foreground">
               Tap the heart on product cards or product detail pages to save favorites.
             </p>
@@ -136,40 +148,41 @@ export default function WishlistPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => {
             const product = item.product;
             const productId = item.product_id ?? product?.id;
             return (
-              <Card key={item.id ?? productId}>
-                <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="relative h-28 w-24 overflow-hidden rounded-xl bg-muted">
-                      {product?.image_url ? (
-                        <Image
-                          src={product.image_url}
-                          alt={product.name ?? "Wishlist product"}
-                          fill
-                          className="object-cover"
-                          sizes="120px"
-                        />
-                      ) : null}
-                    </div>
-                    <div className="space-y-1">
-                      <Link
-                        href={productId ? `/products/${productId}` : "/products"}
-                        className="font-medium hover:underline"
-                      >
-                        {product?.name ?? "Unavailable product"}
-                      </Link>
-                      <p className="text-sm text-muted-foreground">
-                        {product?.style ?? "style"} · {product?.color ?? "color"} ·{" "}
-                        {product?.stock && product.stock > 0 ? `${product.stock} in stock` : "Sold out"}
-                      </p>
-                      <p className="text-sm font-medium">{formatVND(product?.price)}</p>
-                    </div>
+              <Card key={item.id ?? productId} className="surface-card overflow-hidden rounded-[1.5rem]">
+                <div className="relative h-72 bg-muted">
+                  {product?.image_url ? (
+                    <Image
+                      src={product.image_url}
+                      alt={product.name ?? "Wishlist product"}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 1024px) 100vw, 33vw"
+                    />
+                  ) : null}
+                  <div className="absolute left-3 top-3">
+                    <Badge variant={product?.stock && product.stock > 0 ? "secondary" : "destructive"}>
+                      {product?.stock && product.stock > 0 ? "In stock" : "Sold out"}
+                    </Badge>
                   </div>
-
+                </div>
+                <CardContent className="space-y-4 p-5">
+                  <div>
+                    <Link
+                      href={productId ? `/products/${productId}` : "/products"}
+                      className="font-heading text-2xl font-semibold hover:underline"
+                    >
+                      {product?.name ?? "Unavailable product"}
+                    </Link>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {product?.style ?? "style"} / {product?.color ?? "color"}
+                    </p>
+                  </div>
+                  <p className="font-heading text-2xl font-semibold">{formatVND(product?.price)}</p>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       onClick={() => onAddToCart(productId)}

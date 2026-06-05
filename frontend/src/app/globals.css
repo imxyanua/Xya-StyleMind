@@ -3,10 +3,57 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: 247 243 234;
+    --foreground: 28 31 25;
+    --card: 255 252 246;
+    --card-foreground: 28 31 25;
+    --muted: 235 227 213;
+    --muted-foreground: 103 96 84;
+    --primary: 37 46 34;
+    --primary-foreground: 252 248 239;
+    --secondary: 225 214 195;
+    --secondary-foreground: 37 46 34;
+    --destructive: 171 47 47;
+    --border: 214 204 187;
+    --input: 220 210 192;
+    --ring: 111 129 96;
+  }
+
   * {
     @apply box-border;
   }
+
+  html {
+    @apply scroll-smooth;
+  }
+
   body {
-    @apply bg-white text-zinc-900 antialiased;
+    @apply min-h-screen bg-background font-sans text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at 12% 8%, rgb(255 255 255 / 0.9), transparent 30rem),
+      radial-gradient(circle at 88% 4%, rgb(196 216 184 / 0.35), transparent 24rem),
+      linear-gradient(135deg, rgb(247 243 234), rgb(239 234 224));
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-heading tracking-tight;
+  }
+}
+
+@layer components {
+  .surface-card {
+    @apply border border-border/80 bg-card/90 shadow-soft backdrop-blur;
+  }
+
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground;
+  }
+
+  .state-panel {
+    @apply flex min-h-64 flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border bg-card/70 p-8 text-center;
   }
 }

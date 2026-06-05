@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Star } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,22 +33,23 @@ export function ProductCard({
   const inStock = product.stock > 0;
 
   return (
-    <Card className="h-full overflow-hidden">
-      <div className="relative h-64 w-full">
+    <Card className="group h-full overflow-hidden border-border/80 bg-card/90 shadow-product transition duration-300 hover:-translate-y-1 hover:shadow-soft">
+      <div className="relative h-72 w-full overflow-hidden bg-muted">
         <Image
           src={product.image_url}
           alt={product.name}
           fill
-          className="object-cover"
+          className="object-cover transition duration-700 group-hover:scale-105"
           sizes="(max-width: 1024px) 100vw, 33vw"
         />
-        <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-          <Badge variant={inStock ? "secondary" : "destructive"}>
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 bg-gradient-to-b from-black/45 to-transparent p-3">
+          <Badge variant={inStock ? "secondary" : "destructive"} className="bg-card/95">
             {inStock ? "In stock" : "Sold out"}
           </Badge>
           {hasRating ? (
-            <Badge variant="outline" className="bg-background/90">
-              {product.average_rating.toFixed(1)} / 5 ({product.review_count})
+            <Badge variant="outline" className="gap-1 border-white/50 bg-card/95">
+              <Star className="size-3 fill-current" />
+              {product.average_rating.toFixed(1)} ({product.review_count})
             </Badge>
           ) : null}
         </div>
@@ -56,30 +58,35 @@ export function ProductCard({
             active={wishlisted}
             loading={wishlistLoading}
             onToggle={() => onToggleWishlist(product.id)}
-            className="absolute right-3 top-3 bg-background/90"
+            className="absolute bottom-3 right-3 bg-card/95 shadow-soft"
           />
         ) : null}
       </div>
-      <CardHeader className="space-y-2">
-        <CardTitle className="line-clamp-2">{product.name}</CardTitle>
+      <CardHeader className="space-y-2 pb-0">
+        <CardTitle className="line-clamp-2 text-xl">{product.name}</CardTitle>
         {categoryName ? (
           <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{categoryName}</p>
         ) : null}
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="text-lg font-semibold">{formatVND(product.price)}</div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="font-heading text-2xl font-semibold">{formatVND(product.price)}</div>
+          <p className="text-xs text-muted-foreground">
+            {inStock ? `${product.stock} left` : "Sold out"}
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant="secondary">{product.style}</Badge>
           <Badge variant="outline">{product.color}</Badge>
         </div>
-        <p className="text-sm text-muted-foreground">
+        <p className="min-h-5 text-sm text-muted-foreground">
           {inStock ? `${product.stock} items available` : "Currently out of stock"}
         </p>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="bg-muted/40">
         <Link
           href={`/products/${product.id}`}
-          className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+          className="inline-flex w-full items-center justify-center rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary hover:text-primary-foreground"
         >
           View details
         </Link>

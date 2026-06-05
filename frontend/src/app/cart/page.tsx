@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchCart, checkoutOrder, removeCartItem, updateCartItem } from "@/lib/api";
+import { checkoutOrder, fetchCart, removeCartItem, updateCartItem } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { ApiError } from "@/types/api";
 import type { Cart } from "@/types/cart";
@@ -55,8 +55,7 @@ export default function CartPage() {
             router.replace("/login?redirect=/cart");
             return;
           }
-          const message = err instanceof Error ? err.message : "Failed to fetch cart";
-          setError(message);
+          setError(err instanceof Error ? err.message : "Failed to fetch cart");
         }
       } finally {
         if (!cancelled) {
@@ -84,15 +83,13 @@ export default function CartPage() {
     setError(null);
     try {
       const res = await updateCartItem(itemId, quantity);
-      const nextCart = res.data ?? null;
-      setCart(nextCart);
+      setCart(res.data ?? null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         router.replace("/login?redirect=/cart");
         return;
       }
-      const message = err instanceof Error ? err.message : "Failed to update cart item";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Failed to update cart item");
     } finally {
       setItemBusyId(null);
     }
@@ -103,8 +100,7 @@ export default function CartPage() {
     setError(null);
     try {
       const res = await removeCartItem(itemId);
-      const nextCart = res.data ?? null;
-      setCart(nextCart);
+      setCart(res.data ?? null);
       setQuantityInputs((prev) => {
         const copy = { ...prev };
         delete copy[itemId];
@@ -115,8 +111,7 @@ export default function CartPage() {
         router.replace("/login?redirect=/cart");
         return;
       }
-      const message = err instanceof Error ? err.message : "Failed to remove cart item";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Failed to remove cart item");
     } finally {
       setItemBusyId(null);
     }
@@ -133,42 +128,63 @@ export default function CartPage() {
         router.replace("/login?redirect=/cart");
         return;
       }
-      const message = err instanceof Error ? err.message : "Checkout failed";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Checkout failed");
     } finally {
       setCheckoutLoading(false);
     }
   }
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading cart...</p>;
+    return (
+      <div className="grid gap-4">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="h-36 animate-pulse rounded-[1.5rem] bg-muted/80" />
+        ))}
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Your Cart</h1>
+    <div className="space-y-7">
+      <div className="surface-card flex flex-col gap-4 rounded-[2rem] p-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="eyebrow">Checkout path</p>
+          <h1 className="mt-2 text-4xl font-semibold">Your Cart</h1>
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+            Review quantities and confirm your order from the live backend cart.
+          </p>
+        </div>
         <Button variant="outline" asChild>
           <Link href="/products">Continue shopping</Link>
         </Button>
       </div>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? (
+        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
 
       {isEmpty ? (
-        <Card>
-          <CardContent className="py-8">
-            <p className="text-sm text-muted-foreground">Your cart is empty.</p>
+        <Card className="surface-card">
+          <CardContent className="state-panel">
+            <p className="text-xl font-semibold">Your cart is empty.</p>
+            <p className="max-w-md text-sm text-muted-foreground">
+              Add a piece from product detail to begin the checkout flow.
+            </p>
+            <Button asChild>
+              <Link href="/products">Browse products</Link>
+            </Button>
           </CardContent>
         </Card>
       ) : (
-        <>
+        <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-4">
             {cart?.items.map((item) => (
-              <Card key={item.id}>
-                <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <Card key={item.id} className="surface-card overflow-hidden rounded-[1.5rem]">
+                <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="relative h-24 w-20 overflow-hidden rounded-md">
+                    <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-2xl bg-muted">
                       <Image
                         src={item.product.image_url}
                         alt={item.product.name}
@@ -178,20 +194,20 @@ export default function CartPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <p className="font-medium">{item.product.name}</p>
+                      <p className="font-heading text-xl font-semibold">{item.product.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {item.product.style} · {item.product.color}
+                        {item.product.style} / {item.product.color}
                       </p>
                       <p className="text-sm">{formatVND(item.product.price)}</p>
-                      <p className="text-sm font-medium">Subtotal: {formatVND(item.subtotal)}</p>
+                      <p className="text-sm font-semibold">Subtotal: {formatVND(item.subtotal)}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <input
                       type="number"
                       min={1}
-                      className="h-8 w-20 rounded-md border border-input px-2 text-sm"
+                      className="h-10 w-20 rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                       value={quantityInputs[item.id] ?? item.quantity}
                       onChange={(event) =>
                         setQuantityInputs((prev) => ({
@@ -220,17 +236,23 @@ export default function CartPage() {
             ))}
           </div>
 
-          <Card>
+          <Card className="surface-card h-fit rounded-[1.5rem] lg:sticky lg:top-28">
             <CardHeader>
-              <CardTitle>Total: {formatVND(cart?.total ?? 0)}</CardTitle>
+              <CardTitle className="text-2xl">Order summary</CardTitle>
             </CardHeader>
-            <CardContent>
-              <Button onClick={onCheckout} disabled={checkoutLoading || isEmpty}>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between rounded-2xl bg-muted/60 p-4">
+                <span className="text-sm text-muted-foreground">Total</span>
+                <span className="font-heading text-2xl font-semibold">
+                  {formatVND(cart?.total ?? 0)}
+                </span>
+              </div>
+              <Button className="w-full" onClick={onCheckout} disabled={checkoutLoading || isEmpty}>
                 {checkoutLoading ? "Processing..." : "Checkout"}
               </Button>
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
     </div>
   );

@@ -367,38 +367,40 @@ export default function ProductDetailPage() {
 
   return (
     <div className="space-y-8">
-      <Card className="overflow-hidden">
-        <div className="relative h-80 w-full sm:h-[28rem]">
+      <Card className="overflow-hidden rounded-[2rem] border-border/80 bg-card shadow-soft">
+        <div className="relative h-80 w-full overflow-hidden bg-muted sm:h-[32rem]">
           <Image
             src={product.image_url}
             alt={product.name}
             fill
             className="object-cover"
             sizes="100vw"
+            priority
           />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/15" />
           <div className="absolute right-4 top-4">
             <WishlistButton
               active={wishlisted}
               loading={wishlistBusy || viewerLoading}
               onToggle={onToggleWishlist}
               label
-              className="bg-background/90"
+              className="bg-card/95"
             />
           </div>
         </div>
-        <CardHeader>
+        <CardHeader className="p-6 sm:p-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <h1 className="font-heading text-3xl font-semibold leading-tight tracking-tight">
+            <h1 className="font-heading text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
               {product.name}
             </h1>
-            <div className="rounded-2xl border bg-muted/40 px-4 py-2 text-sm">
-              <span className="font-semibold">{displayedRating.toFixed(1)}</span> / 5 ·{" "}
+            <div className="rounded-2xl border border-border bg-muted/50 px-4 py-2 text-sm shadow-sm">
+              <span className="font-semibold">{displayedRating.toFixed(1)}</span> / 5 /{" "}
               {displayedReviewCount} review{displayedReviewCount === 1 ? "" : "s"}
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="text-xl font-semibold">{formatVND(product.price)}</div>
+        <CardContent className="space-y-5 px-6 pb-8 sm:px-8">
+          <div className="font-heading text-4xl font-semibold">{formatVND(product.price)}</div>
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">{product.style}</Badge>
             <Badge variant="outline">{product.color}</Badge>
@@ -406,10 +408,22 @@ export default function ProductDetailPage() {
               {product.stock > 0 ? `${product.stock} in stock` : "Sold out"}
             </Badge>
           </div>
-          <p className="leading-relaxed">{product.description}</p>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          {wishlistError ? <p className="text-sm text-red-600">{wishlistError}</p> : null}
-          {success ? <p className="text-sm text-green-700">{success}</p> : null}
+          <p className="max-w-3xl leading-7 text-muted-foreground">{product.description}</p>
+          {error ? (
+            <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+          {wishlistError ? (
+            <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {wishlistError}
+            </p>
+          ) : null}
+          {success ? (
+            <p className="rounded-xl border border-primary/20 bg-secondary/70 px-3 py-2 text-sm text-primary">
+              {success}
+            </p>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <Button onClick={onAddToCart} disabled={adding || product.stock <= 0}>
               {adding ? "Adding..." : "Add to Cart"}
@@ -425,9 +439,9 @@ export default function ProductDetailPage() {
       </Card>
 
       <section className="grid gap-6 lg:grid-cols-[360px_1fr]">
-        <Card>
+        <Card className="surface-card rounded-[1.75rem]">
           <CardHeader>
-            <CardTitle>Rating summary</CardTitle>
+            <CardTitle className="text-2xl">Rating summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             {reviewsLoading ? (
@@ -447,20 +461,20 @@ export default function ProductDetailPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="surface-card rounded-[1.75rem]">
           <CardHeader>
-            <CardTitle>Write a review</CardTitle>
+            <CardTitle className="text-2xl">Write a review</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {!getToken() ? (
-              <div className="rounded-xl border bg-muted/40 p-4">
+              <div className="rounded-2xl border border-border bg-muted/50 p-4">
                 <p className="text-sm text-muted-foreground">Login to review this product.</p>
                 <Button className="mt-3" asChild>
                   <Link href={`/login?redirect=/products/${product.id}`}>Login to review</Link>
                 </Button>
               </div>
             ) : !ownReview && !purchasedOrderId ? (
-              <p className="rounded-xl border bg-muted/40 p-4 text-sm text-muted-foreground">
+              <p className="rounded-2xl border border-border bg-muted/50 p-4 text-sm text-muted-foreground">
                 Reviews are available after checkout. If you already bought this product, refresh
                 your orders and try again.
               </p>
@@ -472,7 +486,7 @@ export default function ProductDetailPage() {
                   </label>
                   <select
                     id="rating"
-                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                    className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                     value={formRating}
                     onChange={(event) => setReviewRating(Number(event.target.value))}
                   >
@@ -489,7 +503,7 @@ export default function ProductDetailPage() {
                   </label>
                   <textarea
                     id="comment"
-                    className="min-h-28 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                    className="min-h-32 w-full rounded-xl border border-input bg-card px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                     value={formComment}
                     maxLength={MAX_COMMENT_LENGTH}
                     onChange={(event) => setReviewComment(event.target.value)}
@@ -499,8 +513,8 @@ export default function ProductDetailPage() {
                     {formComment.length}/{MAX_COMMENT_LENGTH} characters
                   </p>
                 </div>
-                {reviewError ? <p className="text-sm text-red-600">{reviewError}</p> : null}
-                {reviewMessage ? <p className="text-sm text-green-700">{reviewMessage}</p> : null}
+                {reviewError ? <p className="text-sm text-destructive">{reviewError}</p> : null}
+                {reviewMessage ? <p className="text-sm text-primary">{reviewMessage}</p> : null}
                 <div className="flex flex-wrap gap-2">
                   <Button onClick={onSubmitReview} disabled={reviewSaving}>
                     {reviewSaving ? "Saving..." : ownReview ? "Update review" : "Submit review"}
@@ -517,22 +531,22 @@ export default function ProductDetailPage() {
         </Card>
       </section>
 
-      <Card>
+      <Card className="surface-card rounded-[1.75rem]">
         <CardHeader>
-          <CardTitle>Reviews</CardTitle>
+          <CardTitle className="text-2xl">Reviews</CardTitle>
         </CardHeader>
         <CardContent>
           {reviewsLoading ? (
             <p className="text-sm text-muted-foreground">Loading reviews...</p>
           ) : null}
-          {reviewsError ? <p className="text-sm text-red-600">{reviewsError}</p> : null}
+          {reviewsError ? <p className="text-sm text-destructive">{reviewsError}</p> : null}
           {!reviewsLoading && !reviewsError && reviews.length === 0 ? (
             <p className="text-sm text-muted-foreground">No reviews yet.</p>
           ) : null}
           {!reviewsLoading && !reviewsError && reviews.length > 0 ? (
             <div className="space-y-4">
               {reviews.map((review) => (
-                <div key={review.id} className="rounded-2xl border p-4">
+                <div key={review.id} className="rounded-2xl border border-border bg-card/70 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="font-medium">{review.rating ?? 0} / 5 stars</p>
                     <p className="text-xs text-muted-foreground">{formatDate(review.created_at)}</p>

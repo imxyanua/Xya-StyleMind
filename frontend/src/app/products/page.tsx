@@ -271,15 +271,14 @@ function ProductsBrowser() {
 
   return (
     <div className="space-y-8">
-      <section className="rounded-3xl border bg-[radial-gradient(circle_at_top_left,_rgba(15,23,42,0.09),_transparent_34%),linear-gradient(135deg,_#f8f3e8,_#eef5ef)] p-6 sm:p-8">
-        <div className="max-w-3xl space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-            Product discovery
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
+      <section className="relative overflow-hidden rounded-[2.25rem] border border-border bg-card p-6 shadow-soft sm:p-9">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(255,255,255,0.9),transparent_22rem),radial-gradient(circle_at_88%_0%,rgba(95,115,78,0.18),transparent_22rem)]" />
+        <div className="relative max-w-4xl space-y-4">
+          <p className="eyebrow">Product discovery</p>
+          <h1 className="text-4xl font-semibold leading-none sm:text-6xl">
             Search the catalog by mood, price, rating, and stock.
           </h1>
-          <p className="text-sm leading-6 text-muted-foreground sm:text-base">
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
             Filters are synced to the URL, so the exact product view can be refreshed or shared.
           </p>
         </div>
@@ -287,9 +286,9 @@ function ProductsBrowser() {
 
       <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
         <aside className="lg:sticky lg:top-6 lg:self-start">
-          <Card>
+          <Card className="surface-card rounded-[1.75rem]">
             <CardHeader className="space-y-2">
-              <CardTitle>Filters</CardTitle>
+              <CardTitle className="text-2xl">Filters</CardTitle>
               <p className="text-sm text-muted-foreground">
                 {activeFilterCount} active filter{activeFilterCount === 1 ? "" : "s"}
               </p>
@@ -316,7 +315,7 @@ function ProductsBrowser() {
                 </label>
                 <select
                   id="category_id"
-                  className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                  className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                   value={queryParams.category_id ?? ""}
                   onChange={(event) => updateFilter("category_id", event.target.value || undefined)}
                 >
@@ -336,7 +335,7 @@ function ProductsBrowser() {
                   </label>
                   <select
                     id="style"
-                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                    className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                     value={queryParams.style ?? ""}
                     onChange={(event) => updateFilter("style", event.target.value || undefined)}
                   >
@@ -355,7 +354,7 @@ function ProductsBrowser() {
                   </label>
                   <select
                     id="color"
-                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                    className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                     value={queryParams.color ?? ""}
                     onChange={(event) => updateFilter("color", event.target.value || undefined)}
                   >
@@ -405,7 +404,7 @@ function ProductsBrowser() {
                   </label>
                   <select
                     id="min_rating"
-                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                    className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                     value={queryParams.min_rating ?? ""}
                     onChange={(event) => updateFilter("min_rating", event.target.value || undefined)}
                   >
@@ -424,7 +423,7 @@ function ProductsBrowser() {
                   </label>
                   <select
                     id="in_stock"
-                    className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                    className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                     value={
                       queryParams.in_stock === undefined ? "" : String(queryParams.in_stock)
                     }
@@ -452,9 +451,9 @@ function ProductsBrowser() {
         </aside>
 
         <main className="space-y-5">
-          <div className="flex flex-col gap-3 rounded-2xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="surface-card flex flex-col gap-3 rounded-[1.5rem] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-medium">
+              <p className="text-base font-semibold">
                 {loading ? "Searching catalog..." : `${meta?.total ?? products.length} products found`}
               </p>
               <p className="text-xs text-muted-foreground">
@@ -464,7 +463,7 @@ function ProductsBrowser() {
             <div className="flex flex-col gap-3 sm:flex-row">
               <select
                 aria-label="Sort products"
-                className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
+                className="h-10 rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                 value={queryParams.sort ?? "newest"}
                 onChange={(event) => updateFilter("sort", event.target.value)}
               >
@@ -476,7 +475,7 @@ function ProductsBrowser() {
               </select>
               <select
                 aria-label="Products per page"
-                className="h-9 rounded-lg border border-input bg-background px-3 text-sm"
+                className="h-10 rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                 value={queryParams.limit ?? 20}
                 onChange={(event) => updateFilter("limit", Number(event.target.value))}
               >
@@ -490,7 +489,7 @@ function ProductsBrowser() {
           </div>
 
           {error ? (
-            <Card className="border-destructive/30 bg-destructive/5">
+            <Card className="border-destructive/30 bg-destructive/10">
               <CardContent className="p-6">
                 <p className="font-medium text-destructive">Could not load products.</p>
                 <p className="mt-1 text-sm text-muted-foreground">{error}</p>
@@ -507,14 +506,14 @@ function ProductsBrowser() {
           {loading ? (
             <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="h-[420px] animate-pulse rounded-2xl bg-muted" />
+                <div key={index} className="h-[470px] animate-pulse rounded-[1.75rem] bg-muted/80" />
               ))}
             </div>
           ) : null}
 
           {!loading && !error && products.length === 0 ? (
-            <Card>
-              <CardContent className="flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center">
+            <Card className="surface-card">
+              <CardContent className="state-panel">
                 <p className="text-lg font-semibold">No products matched those filters.</p>
                 <p className="max-w-md text-sm text-muted-foreground">
                   Try lowering the rating threshold, expanding the price range, or clearing filters.
@@ -546,7 +545,7 @@ function ProductsBrowser() {
                 ))}
               </div>
 
-              <div className="flex flex-col gap-3 rounded-2xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="surface-card flex flex-col gap-3 rounded-[1.5rem] p-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-muted-foreground">
                   Showing page {meta?.page ?? 1} of {totalPages}. Total{" "}
                   {meta?.total ?? products.length} products.
