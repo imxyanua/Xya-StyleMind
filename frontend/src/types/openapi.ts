@@ -320,16 +320,16 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /**
-         * Update order status
-         * @description Admin only. Allowed statuses are pending, paid, shipping, completed, cancelled.
-         */
-        put: operations["updateOrderStatus"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update order status
+         * @description Admin only. Allowed statuses are pending, paid, shipping, completed, cancelled.
+         */
+        patch: operations["updateOrderStatus"];
         trace?: never;
     };
     "/api/v1/wishlist": {
@@ -774,11 +774,22 @@ export interface components {
             subtotal?: number;
             product?: components["schemas"]["OrderProduct"];
         };
+        /** @description Minimal user info for admin order management. Does not include password hashes or tokens. */
+        OrderUser: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: email */
+            email?: string;
+            full_name?: string;
+            /** @enum {string} */
+            role?: "user" | "admin";
+        };
         Order: {
             /** Format: uuid */
             id?: string;
             /** Format: uuid */
             user_id?: string;
+            user?: components["schemas"]["OrderUser"];
             /** @enum {string} */
             status?: "pending" | "paid" | "shipping" | "completed" | "cancelled";
             total_amount?: number;
@@ -1535,6 +1546,15 @@ export interface operations {
                 page?: components["parameters"]["PageParam"];
                 /** @example 20 */
                 limit?: components["parameters"]["LimitParam"];
+                /** @description Search by order id. */
+                q?: string;
+                status?: "pending" | "paid" | "shipping" | "completed" | "cancelled";
+                user_id?: string;
+                /** @description Created-at start date or RFC3339 timestamp. */
+                from?: string;
+                /** @description Created-at end date or RFC3339 timestamp. */
+                to?: string;
+                sort?: "newest" | "oldest";
             };
             header?: never;
             path?: never;

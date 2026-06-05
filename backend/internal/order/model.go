@@ -36,9 +36,17 @@ type OrderItem struct {
 	Product   ProductInfo `json:"product"`
 }
 
+type OrderUser struct {
+	ID       string `json:"id"`
+	Email    string `json:"email"`
+	FullName string `json:"full_name"`
+	Role     string `json:"role"`
+}
+
 type OrderResponse struct {
 	ID          string      `json:"id"`
 	UserID      string      `json:"user_id"`
+	User        *OrderUser  `json:"user,omitempty"`
 	Status      string      `json:"status"`
 	TotalAmount float64     `json:"total_amount"`
 	Items       []OrderItem `json:"items"`
@@ -56,4 +64,18 @@ type CheckoutItem struct {
 	Price      float64
 	Stock      int
 	Quantity   int
+}
+
+const (
+	AdminOrderSortNewest = "newest"
+	AdminOrderSortOldest = "oldest"
+)
+
+type AdminOrderFilter struct {
+	Query  string
+	Status string
+	UserID string
+	From   *time.Time
+	To     *time.Time
+	Sort   string
 }

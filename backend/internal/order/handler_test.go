@@ -276,6 +276,16 @@ func TestProtectedAdminOrdersList_UserForbidden(t *testing.T) {
 	assertOrderErrorResponse(t, w, http.StatusForbidden, "forbidden")
 }
 
+func TestProtectedAdminOrdersList_RequireToken(t *testing.T) {
+	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/orders", nil)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusUnauthorized, "unauthorized")
+}
+
 func TestProtectedAdminOrdersList_AdminAllowed(t *testing.T) {
 	repo := &fakeOrderRepository{}
 	router := newProtectedOrderTestRouter(repo, "test-secret")
@@ -295,6 +305,64 @@ func TestProtectedAdminOrdersList_AdminAllowed(t *testing.T) {
 	}
 	if repo.listAllLimit != 10 || repo.listAllOffset != 10 {
 		t.Fatalf("repo list all pagination = limit:%d offset:%d, want 10/10", repo.listAllLimit, repo.listAllOffset)
+	}
+}
+
+func TestProtectedAdminOrdersList_FiltersAndSorts(t *testing.T) {
+	repo := &fakeOrderRepository{}
+	router := newProtectedOrderTestRouter(repo, "test-secret")
+
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	userID := uuid.NewString()
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/orders?q=abc&status=paid&user_id="+userID+"&from=2026-01-01&to=2026-01-31&sort=oldest&page=2&limit=10", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if repo.lastAdminFilter.Query != "abc" || repo.lastAdminFilter.Status != StatusPaid || repo.lastAdminFilter.UserID != userID || repo.lastAdminFilter.Sort != AdminOrderSortOldest {
+		t.Fatalf("admin filter = %+v, want q/status/user/sort", repo.lastAdminFilter)
+	}
+	if repo.lastAdminFilter.From == nil || repo.lastAdminFilter.To == nil {
+		t.Fatalf("admin date filter = %+v, want from/to", repo.lastAdminFilter)
+	}
+	if strings.Contains(w.Body.String(), "password") || strings.Contains(w.Body.String(), "hash") || strings.Contains(w.Body.String(), "token") {
+		t.Fatalf("admin order response leaked sensitive field: %s", w.Body.String())
+	}
+}
+
+func TestProtectedAdminOrdersList_InvalidFilters(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		query   string
+		message string
+	}{
+		{name: "status", query: "?status=shipped", message: "invalid status"},
+		{name: "user_id", query: "?user_id=bad-id", message: "invalid user_id"},
+		{name: "sort", query: "?sort=price_desc", message: "invalid sort"},
+		{name: "date_range", query: "?from=2026-02-01&to=2026-01-01", message: "validation failed"},
+		{name: "from", query: "?from=not-a-date", message: "invalid from"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
+			token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
+			if err != nil {
+				t.Fatalf("GenerateToken error = %v", err)
+			}
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/orders"+tc.query, nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			router.ServeHTTP(w, req)
+
+			assertOrderErrorResponse(t, w, http.StatusBadRequest, tc.message)
+		})
 	}
 }
 
@@ -375,6 +443,30 @@ func TestProtectedAdminOrderStatus_AdminAllowed(t *testing.T) {
 		"request_id": "req-order-audit-1",
 	})
 	assertOrderAuditDoesNotContain(t, audit.String(), token, "Authorization", "Bearer")
+}
+
+func TestProtectedAdminOrderStatus_PatchAllowed(t *testing.T) {
+	repo := &fakeOrderRepository{currentStatus: StatusPending}
+	router := newProtectedOrderTestRouter(repo, "test-secret")
+
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	orderID := uuid.NewString()
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/orders/"+orderID+"/status", bytes.NewBufferString(`{"status":"paid"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if repo.lastStatus != StatusPaid {
+		t.Fatalf("repo lastStatus = %s, want paid", repo.lastStatus)
+	}
 }
 
 func TestProtectedAdminOrderStatusFailed_WritesSafeAuditReason(t *testing.T) {

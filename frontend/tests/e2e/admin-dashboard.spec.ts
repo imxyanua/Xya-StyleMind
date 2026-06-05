@@ -28,6 +28,10 @@ type Product = {
 type Order = {
   id: string;
   status: string;
+  user?: {
+    email?: string;
+    full_name?: string;
+  };
 };
 
 async function apiGet<T>(request: APIRequestContext, path: string, token?: string) {
@@ -99,7 +103,8 @@ async function setupAdmin(page: Page, request: APIRequestContext, suffix: string
 }
 
 async function createBuyerOrder(request: APIRequestContext, suffix: string) {
-  const buyer = await registerViaApi(request, `buyer-${suffix}@example.com`, "E2E Buyer");
+  const buyerEmail = `buyer-${suffix}@example.com`;
+  const buyer = await registerViaApi(request, buyerEmail, "E2E Buyer");
   const token = buyer.data?.token;
   expect(token).toBeTruthy();
 
@@ -121,7 +126,7 @@ async function createBuyerOrder(request: APIRequestContext, suffix: string) {
   );
   const orderResponse = await apiPost<Order>(request, "/orders", {}, token);
   expect(orderResponse.data?.id).toBeTruthy();
-  return orderResponse.data as Order;
+  return { order: orderResponse.data as Order, buyerEmail };
 }
 
 test("admin auth protects dashboard access", async ({ page, request }) => {
@@ -134,6 +139,8 @@ test("admin auth protects dashboard access", async ({ page, request }) => {
   await registerViaApi(request, userEmail, "E2E Regular User");
   await loginThroughUi(page, userEmail);
   await page.goto("/admin");
+  await expect(page.getByText("Admin access required.")).toBeVisible();
+  await page.goto("/admin/orders");
   await expect(page.getByText("Admin access required.")).toBeVisible();
 
   await setupAdmin(page, request, suffix);
@@ -226,21 +233,33 @@ test("admin can update order status and sees invalid transition errors", async (
   request,
 }) => {
   const suffix = String(Date.now());
-  const order = await createBuyerOrder(request, suffix);
+  const { order, buyerEmail } = await createBuyerOrder(request, suffix);
 
   await setupAdmin(page, request, `orders-${suffix}`);
   await page.goto("/admin/orders");
   await expect(page.getByText("Update Order Status")).toBeVisible();
+  await expect(page.getByText("Admin Orders")).toBeVisible();
 
-  await page.getByLabel("Order ID").fill(order.id);
-  await page.getByLabel("Status").selectOption("paid");
+  await page.getByLabel("Search order ID").fill(order.id);
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page.getByText(order.id)).toBeVisible();
+  await expect(page.getByText(buyerEmail).first()).toBeVisible();
+
+  await page.getByLabel("Order ID", { exact: true }).fill(order.id);
+  await page.getByLabel("Status", { exact: true }).selectOption("paid");
   await page.getByRole("button", { name: "Update status" }).click();
+  await expect(page.getByText("Order status updated.")).toBeVisible();
   await expect(page.getByText("Last Updated Order")).toBeVisible();
   await expect(page.getByText(order.id)).toBeVisible();
   await expect(page.locator("p").filter({ hasText: /^paid$/ }).first()).toBeVisible();
 
-  await page.getByLabel("Order ID").fill(order.id);
-  await page.getByLabel("Status").selectOption("completed");
+  await page.getByLabel("Status filter").selectOption("paid");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page.getByText(order.id)).toBeVisible();
+  await expect(page.getByText(buyerEmail).first()).toBeVisible();
+
+  await page.getByLabel("Order ID", { exact: true }).fill(order.id);
+  await page.getByLabel("Status", { exact: true }).selectOption("completed");
   await page.getByRole("button", { name: "Update status" }).click();
   await expect(page.getByText(/invalid order status transition/i)).toBeVisible();
 });

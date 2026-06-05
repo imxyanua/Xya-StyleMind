@@ -504,6 +504,37 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PageParam'
         - $ref: '#/components/parameters/LimitParam'
+        - name: q
+          in: query
+          description: Search by order id.
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, paid, shipping, completed, cancelled]
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          description: Created-at start date or RFC3339 timestamp.
+          schema:
+            type: string
+        - name: to
+          in: query
+          description: Created-at end date or RFC3339 timestamp.
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, oldest]
+            default: newest
       responses:
         '200':
           description: All orders
@@ -549,7 +580,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/admin/orders/{id}/status:
-    put:
+    patch:
       tags: [Orders]
       summary: Update order status
       description: Admin only. Allowed statuses are pending, paid, shipping, completed, cancelled.
@@ -1562,6 +1593,21 @@ components:
           type: number
         product:
           $ref: '#/components/schemas/OrderProduct'
+    OrderUser:
+      type: object
+      description: Minimal user info for admin order management. Does not include password hashes or tokens.
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
     Order:
       type: object
       properties:
@@ -1571,6 +1617,8 @@ components:
         user_id:
           type: string
           format: uuid
+        user:
+          $ref: '#/components/schemas/OrderUser'
         status:
           type: string
           enum: [pending, paid, shipping, completed, cancelled]

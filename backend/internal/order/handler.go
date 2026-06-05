@@ -3,8 +3,10 @@ package order
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"stylemind/internal/errs"
 	"stylemind/pkg/logger"
+	"time"
 
 	"stylemind/pkg/pagination"
 	"stylemind/pkg/response"
@@ -29,6 +31,7 @@ func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, authMiddleware
 	admin.GET("/orders", h.ListAdmin)
 	admin.GET("/orders/:id", h.GetAdmin)
 	admin.PUT("/orders/:id/status", h.UpdateStatus)
+	admin.PATCH("/orders/:id/status", h.UpdateStatus)
 }
 
 func (h *Handler) Checkout(c *gin.Context) {
@@ -79,8 +82,29 @@ func (h *Handler) GetMine(c *gin.Context) {
 
 func (h *Handler) ListAdmin(c *gin.Context) {
 	page := pagination.Parse(c)
-	orders, total, err := h.service.ListOrders(c.Request.Context(), page.Limit, page.Offset)
+	filter, err := parseAdminOrderFilter(c)
 	if err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	orders, total, err := h.service.ListOrders(c.Request.Context(), filter, page.Limit, page.Offset)
+	if err != nil {
+		if errors.Is(err, errs.ErrInvalidOrderStatus) {
+			response.Error(c, http.StatusBadRequest, "invalid status")
+			return
+		}
+		if errors.Is(err, errs.ErrInvalidID) {
+			response.Error(c, http.StatusBadRequest, "invalid user_id")
+			return
+		}
+		if errors.Is(err, errs.ErrInvalidSort) {
+			response.Error(c, http.StatusBadRequest, "invalid sort")
+			return
+		}
+		if errors.Is(err, errs.ErrValidationFailed) {
+			response.Error(c, http.StatusBadRequest, "validation failed")
+			return
+		}
 		response.Error(c, http.StatusInternalServerError, "failed to fetch orders")
 		return
 	}
@@ -191,4 +215,41 @@ func safeOrderAuditReason(err error) string {
 	default:
 		return "internal_error"
 	}
+}
+
+func parseAdminOrderFilter(c *gin.Context) (AdminOrderFilter, error) {
+	from, err := parseOptionalTime(c.Query("from"), false)
+	if err != nil {
+		return AdminOrderFilter{}, errors.New("invalid from")
+	}
+	to, err := parseOptionalTime(c.Query("to"), true)
+	if err != nil {
+		return AdminOrderFilter{}, errors.New("invalid to")
+	}
+	return AdminOrderFilter{
+		Query:  strings.TrimSpace(c.Query("q")),
+		Status: strings.TrimSpace(c.Query("status")),
+		UserID: strings.TrimSpace(c.Query("user_id")),
+		From:   from,
+		To:     to,
+		Sort:   strings.TrimSpace(c.DefaultQuery("sort", AdminOrderSortNewest)),
+	}, nil
+}
+
+func parseOptionalTime(raw string, endOfDay bool) (*time.Time, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil, nil
+	}
+	if parsed, err := time.Parse(time.RFC3339, value); err == nil {
+		return &parsed, nil
+	}
+	parsed, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return nil, err
+	}
+	if endOfDay {
+		parsed = parsed.Add(24*time.Hour - time.Nanosecond)
+	}
+	return &parsed, nil
 }

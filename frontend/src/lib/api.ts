@@ -236,9 +236,29 @@ export async function fetchMyOrders(params: OrderListParams = {}) {
   return apiRequest<Order[]>(`/orders${query ? `?${query}` : ""}`, { method: "GET" });
 }
 
+export type AdminOrderListParams = NonNullable<
+  operations["listAdminOrders"]["parameters"]["query"]
+>;
+
+export async function fetchAdminOrders(params: AdminOrderListParams = {}) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+    searchParams.set(key, String(value));
+  }
+  const query = searchParams.toString();
+  return apiRequest<Order[]>(`/admin/orders${query ? `?${query}` : ""}`, { method: "GET" });
+}
+
+export async function fetchAdminOrder(id: string) {
+  return apiRequest<Order>(`/admin/orders/${id}`, { method: "GET" });
+}
+
 export async function updateOrderStatus(id: string, status: Order["status"]) {
   return apiRequest<Order>(`/admin/orders/${id}/status`, {
-    method: "PUT",
+    method: "PATCH",
     body: JSON.stringify({ status }),
   });
 }

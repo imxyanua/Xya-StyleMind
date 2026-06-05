@@ -26,6 +26,7 @@ type fakeOrderRepository struct {
 	lastOrderID            string
 	lastStatus             string
 	lastAllowedStatuses    []string
+	lastAdminFilter        AdminOrderFilter
 	listLimit              int
 	listOffset             int
 	listAllLimit           int
@@ -79,13 +80,19 @@ func (r *fakeOrderRepository) ListOrdersByUser(_ context.Context, userID string,
 	return []OrderResponse{{ID: "order-1", UserID: userID, Items: []OrderItem{}}}, 1, nil
 }
 
-func (r *fakeOrderRepository) ListOrders(_ context.Context, limit, offset int) ([]OrderResponse, int64, error) {
+func (r *fakeOrderRepository) ListOrders(_ context.Context, filter AdminOrderFilter, limit, offset int) ([]OrderResponse, int64, error) {
+	r.lastAdminFilter = filter
 	r.listAllLimit = limit
 	r.listAllOffset = offset
 	if r.listAllOrdersErr != nil {
 		return nil, 0, r.listAllOrdersErr
 	}
-	return []OrderResponse{{ID: "admin-order-1", UserID: "user-1", Items: []OrderItem{}}}, 1, nil
+	return []OrderResponse{{
+		ID:     "admin-order-1",
+		UserID: "user-1",
+		User:   &OrderUser{ID: "user-1", Email: "buyer@example.com", FullName: "Buyer", Role: "user"},
+		Items:  []OrderItem{},
+	}}, 1, nil
 }
 
 func (r *fakeOrderRepository) UpdateOrderStatus(_ context.Context, orderID, status string, allowedCurrentStatuses []string) error {
@@ -161,7 +168,7 @@ func TestServiceListOrders_AdminList(t *testing.T) {
 	repo := &fakeOrderRepository{}
 	service := NewService(repo)
 
-	orders, total, err := service.ListOrders(context.Background(), 50, 100)
+	orders, total, err := service.ListOrders(context.Background(), AdminOrderFilter{Status: StatusPaid, Sort: AdminOrderSortOldest}, 50, 100)
 	if err != nil {
 		t.Fatalf("ListOrders error = %v", err)
 	}
@@ -170,6 +177,23 @@ func TestServiceListOrders_AdminList(t *testing.T) {
 	}
 	if repo.listAllLimit != 50 || repo.listAllOffset != 100 {
 		t.Fatalf("repo list all pagination = limit:%d offset:%d, want 50/100", repo.listAllLimit, repo.listAllOffset)
+	}
+	if repo.lastAdminFilter.Status != StatusPaid || repo.lastAdminFilter.Sort != AdminOrderSortOldest {
+		t.Fatalf("admin filter = %+v, want paid/oldest", repo.lastAdminFilter)
+	}
+}
+
+func TestServiceListOrders_RejectsInvalidAdminFilters(t *testing.T) {
+	service := NewService(&fakeOrderRepository{})
+
+	if _, _, err := service.ListOrders(context.Background(), AdminOrderFilter{Status: "shipped"}, 20, 0); !errors.Is(err, errs.ErrInvalidOrderStatus) {
+		t.Fatalf("invalid status err = %v, want ErrInvalidOrderStatus", err)
+	}
+	if _, _, err := service.ListOrders(context.Background(), AdminOrderFilter{UserID: "bad-id"}, 20, 0); !errors.Is(err, errs.ErrInvalidID) {
+		t.Fatalf("invalid user_id err = %v, want ErrInvalidID", err)
+	}
+	if _, _, err := service.ListOrders(context.Background(), AdminOrderFilter{Sort: "price_desc"}, 20, 0); !errors.Is(err, errs.ErrInvalidSort) {
+		t.Fatalf("invalid sort err = %v, want ErrInvalidSort", err)
 	}
 }
 

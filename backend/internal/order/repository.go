@@ -172,18 +172,29 @@ func (r *Repository) ListOrdersByUser(ctx context.Context, userID string, limit,
 	return out, total, nil
 }
 
-func (r *Repository) ListOrders(ctx context.Context, limit, offset int) ([]OrderResponse, int64, error) {
+func (r *Repository) ListOrders(ctx context.Context, filter AdminOrderFilter, limit, offset int) ([]OrderResponse, int64, error) {
 	var total int64
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM orders`).Scan(&total); err != nil {
+	whereSQL, args := buildAdminOrderWhere(filter)
+	countQuery := `
+		SELECT COUNT(*)
+		FROM orders o
+		JOIN users u ON u.id = o.user_id
+	` + whereSQL
+	if err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	rows, err := r.db.Query(ctx, `
-		SELECT id, user_id, status, total_amount, created_at, updated_at
-		FROM orders
-		ORDER BY created_at DESC
-		LIMIT $1 OFFSET $2
-	`, limit, offset)
+	limitPlaceholder := fmt.Sprintf("$%d", len(args)+1)
+	offsetPlaceholder := fmt.Sprintf("$%d", len(args)+2)
+	queryArgs := append(append([]any{}, args...), limit, offset)
+	query := `
+		SELECT o.id, o.user_id, u.email, u.full_name, u.role, o.status, o.total_amount, o.created_at, o.updated_at
+		FROM orders o
+		JOIN users u ON u.id = o.user_id
+	` + whereSQL + `
+		ORDER BY ` + adminOrderSortClause(filter.Sort) + `
+		LIMIT ` + limitPlaceholder + ` OFFSET ` + offsetPlaceholder
+	rows, err := r.db.Query(ctx, query, queryArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -193,9 +204,15 @@ func (r *Repository) ListOrders(ctx context.Context, limit, offset int) ([]Order
 	orderIDs := make([]string, 0)
 	for rows.Next() {
 		var o OrderResponse
-		if err := rows.Scan(&o.ID, &o.UserID, &o.Status, &o.TotalAmount, &o.CreatedAt, &o.UpdatedAt); err != nil {
+		var user OrderUser
+		if err := rows.Scan(
+			&o.ID, &o.UserID, &user.Email, &user.FullName, &user.Role,
+			&o.Status, &o.TotalAmount, &o.CreatedAt, &o.UpdatedAt,
+		); err != nil {
 			return nil, 0, err
 		}
+		user.ID = o.UserID
+		o.User = &user
 		o.Items = make([]OrderItem, 0)
 		out = append(out, o)
 		orderIDs = append(orderIDs, o.ID)
@@ -242,17 +259,24 @@ func (r *Repository) GetOrderByIDForUser(ctx context.Context, orderID, userID st
 
 func (r *Repository) GetOrderByID(ctx context.Context, orderID string) (*OrderResponse, error) {
 	o := &OrderResponse{}
+	var user OrderUser
 	err := r.db.QueryRow(ctx, `
-		SELECT id, user_id, status, total_amount, created_at, updated_at
-		FROM orders
-		WHERE id = $1
-	`, orderID).Scan(&o.ID, &o.UserID, &o.Status, &o.TotalAmount, &o.CreatedAt, &o.UpdatedAt)
+		SELECT o.id, o.user_id, u.email, u.full_name, u.role, o.status, o.total_amount, o.created_at, o.updated_at
+		FROM orders o
+		JOIN users u ON u.id = o.user_id
+		WHERE o.id = $1
+	`, orderID).Scan(
+		&o.ID, &o.UserID, &user.Email, &user.FullName, &user.Role,
+		&o.Status, &o.TotalAmount, &o.CreatedAt, &o.UpdatedAt,
+	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errs.ErrOrderNotFound
 		}
 		return nil, err
 	}
+	user.ID = o.UserID
+	o.User = &user
 	items, err := r.GetOrderItems(ctx, o.ID)
 	if err != nil {
 		return nil, err
@@ -302,6 +326,48 @@ func (r *Repository) GetOrderStatus(ctx context.Context, orderID string) (string
 		return "", err
 	}
 	return status, nil
+}
+
+func buildAdminOrderWhere(filter AdminOrderFilter) (string, []any) {
+	clauses := make([]string, 0)
+	args := make([]any, 0)
+
+	if filter.Query != "" {
+		args = append(args, "%"+strings.ToLower(strings.TrimSpace(filter.Query))+"%")
+		placeholder := fmt.Sprintf("$%d", len(args))
+		clauses = append(clauses, "LOWER(o.id::text) LIKE "+placeholder)
+	}
+	if filter.Status != "" {
+		args = append(args, filter.Status)
+		clauses = append(clauses, fmt.Sprintf("o.status = $%d", len(args)))
+	}
+	if filter.UserID != "" {
+		args = append(args, filter.UserID)
+		clauses = append(clauses, fmt.Sprintf("o.user_id = $%d::uuid", len(args)))
+	}
+	if filter.From != nil {
+		args = append(args, *filter.From)
+		clauses = append(clauses, fmt.Sprintf("o.created_at >= $%d", len(args)))
+	}
+	if filter.To != nil {
+		args = append(args, *filter.To)
+		clauses = append(clauses, fmt.Sprintf("o.created_at <= $%d", len(args)))
+	}
+	if len(clauses) == 0 {
+		return "", args
+	}
+	return " WHERE " + strings.Join(clauses, " AND "), args
+}
+
+func adminOrderSortClause(sort string) string {
+	switch sort {
+	case AdminOrderSortOldest:
+		return "o.created_at ASC, o.id ASC"
+	case "", AdminOrderSortNewest:
+		return "o.created_at DESC, o.id DESC"
+	default:
+		return "o.created_at DESC, o.id DESC"
+	}
 }
 
 func (r *Repository) GetOrderItems(ctx context.Context, orderID string) ([]OrderItem, error) {

@@ -16,7 +16,7 @@ type OrderRepository interface {
 	CreateOrderFromCart(ctx context.Context, userID, cartID string) (string, error)
 	GetOrderByIDForUser(ctx context.Context, orderID, userID string) (*OrderResponse, error)
 	ListOrdersByUser(ctx context.Context, userID string, limit, offset int) ([]OrderResponse, int64, error)
-	ListOrders(ctx context.Context, limit, offset int) ([]OrderResponse, int64, error)
+	ListOrders(ctx context.Context, filter AdminOrderFilter, limit, offset int) ([]OrderResponse, int64, error)
 	UpdateOrderStatus(ctx context.Context, orderID, status string, allowedCurrentStatuses []string) error
 	GetOrderByID(ctx context.Context, orderID string) (*OrderResponse, error)
 }
@@ -43,8 +43,22 @@ func (s *Service) ListMyOrders(ctx context.Context, userID string, limit, offset
 	return s.repo.ListOrdersByUser(ctx, userID, limit, offset)
 }
 
-func (s *Service) ListOrders(ctx context.Context, limit, offset int) ([]OrderResponse, int64, error) {
-	return s.repo.ListOrders(ctx, limit, offset)
+func (s *Service) ListOrders(ctx context.Context, filter AdminOrderFilter, limit, offset int) ([]OrderResponse, int64, error) {
+	if filter.Status != "" && !IsValidStatus(filter.Status) {
+		return nil, 0, errs.ErrInvalidOrderStatus
+	}
+	if filter.UserID != "" {
+		if _, err := uuid.Parse(filter.UserID); err != nil {
+			return nil, 0, errs.ErrInvalidID
+		}
+	}
+	if filter.From != nil && filter.To != nil && filter.From.After(*filter.To) {
+		return nil, 0, errs.ErrValidationFailed
+	}
+	if !isAllowedAdminOrderSort(filter.Sort) {
+		return nil, 0, errs.ErrInvalidSort
+	}
+	return s.repo.ListOrders(ctx, filter, limit, offset)
 }
 
 func (s *Service) GetMyOrder(ctx context.Context, userID, orderID string) (*OrderResponse, error) {
@@ -72,4 +86,13 @@ func (s *Service) UpdateStatus(ctx context.Context, orderID, status string) (*Or
 		return nil, err
 	}
 	return s.repo.GetOrderByID(ctx, orderID)
+}
+
+func isAllowedAdminOrderSort(sort string) bool {
+	switch sort {
+	case "", AdminOrderSortNewest, AdminOrderSortOldest:
+		return true
+	default:
+		return false
+	}
 }
