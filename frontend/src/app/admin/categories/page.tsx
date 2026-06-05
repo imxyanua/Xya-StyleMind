@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -75,27 +76,43 @@ export default function AdminCategoriesPage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-      <Card>
+    <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+      <Card className="surface-card h-fit rounded-[1.75rem] lg:sticky lg:top-28">
         <CardHeader>
-          <CardTitle>Create Category</CardTitle>
+          <p className="eyebrow">Catalog taxonomy</p>
+          <CardTitle className="text-3xl">Create Category</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit}>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label htmlFor="name" className="text-sm font-medium">
                 Name
               </label>
-              <Input id="name" value={name} onChange={(event) => setName(event.target.value)} required />
+              <Input
+                id="name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Outerwear"
+                required
+              />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label htmlFor="slug" className="text-sm font-medium">
                 Slug
               </label>
-              <Input id="slug" value={slug} onChange={(event) => setSlug(event.target.value)} required />
+              <Input
+                id="slug"
+                value={slug}
+                onChange={(event) => setSlug(event.target.value)}
+                placeholder="outerwear"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Use lowercase words and hyphens for stable public URLs.
+              </p>
             </div>
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
-            {success ? <p className="text-sm text-green-700">{success}</p> : null}
+            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {success ? <p className="text-sm text-primary">{success}</p> : null}
             <Button type="submit" disabled={saving}>
               {saving ? "Saving..." : "Create"}
             </Button>
@@ -103,23 +120,51 @@ export default function AdminCategoriesPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="surface-card rounded-[1.75rem]">
         <CardHeader>
-          <CardTitle>Categories</CardTitle>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="eyebrow">Navigation groups</p>
+              <CardTitle className="mt-2 text-3xl">Categories</CardTitle>
+            </div>
+            <Badge variant="secondary">{categories.length} categories</Badge>
+          </div>
         </CardHeader>
         <CardContent>
-          {loading ? <p className="text-sm text-muted-foreground">Loading categories...</p> : null}
-          {!loading && categories.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No categories yet.</p>
+          {loading ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="h-24 animate-pulse rounded-2xl bg-muted/80" />
+              ))}
+            </div>
           ) : null}
-          <div className="space-y-2">
-            {categories.map((category) => (
-              <div key={category.id} className="flex items-center justify-between rounded-md border p-3">
-                <span className="font-medium">{category.name}</span>
-                <span className="text-sm text-muted-foreground">{category.slug}</span>
-              </div>
-            ))}
-          </div>
+
+          {!loading && categories.length === 0 ? (
+            <div className="state-panel">
+              <p className="text-xl font-semibold">No categories yet.</p>
+              <p className="max-w-md text-sm text-muted-foreground">
+                Create categories before adding product records.
+              </p>
+            </div>
+          ) : null}
+
+          {!loading && categories.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {categories.map((category, index) => (
+                <div key={category.id} className="rounded-2xl border border-border bg-card/70 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-heading text-2xl font-semibold">{category.name}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">/{category.slug}</p>
+                    </div>
+                    <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold">
+                      #{index + 1}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

@@ -11,6 +11,14 @@ import type { Order } from "@/types/order";
 
 const statuses: Order["status"][] = ["pending", "paid", "shipping", "completed", "cancelled"];
 
+const statusHints: Record<Order["status"], string> = {
+  pending: "Order was created and is waiting for payment or review.",
+  paid: "Payment has been confirmed and stock has already been reserved.",
+  shipping: "Order is being fulfilled or handed to logistics.",
+  completed: "Customer has received the order.",
+  cancelled: "Order is closed and should not continue fulfillment.",
+};
+
 function formatVND(value: number) {
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
@@ -43,25 +51,35 @@ export default function AdminOrdersPage() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
-      <Card>
+      <Card className="surface-card h-fit rounded-[1.75rem] lg:sticky lg:top-28">
         <CardHeader>
-          <CardTitle>Update Order Status</CardTitle>
+          <p className="eyebrow">Fulfillment control</p>
+          <CardTitle className="text-3xl">Update Order Status</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit}>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label htmlFor="orderId" className="text-sm font-medium">
                 Order ID
               </label>
-              <Input id="orderId" value={orderId} onChange={(event) => setOrderId(event.target.value)} required />
+              <Input
+                id="orderId"
+                value={orderId}
+                onChange={(event) => setOrderId(event.target.value)}
+                placeholder="Paste full order UUID"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Use the exact order ID from customer order history or admin tooling.
+              </p>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label htmlFor="status" className="text-sm font-medium">
                 Status
               </label>
               <select
                 id="status"
-                className="h-8 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm capitalize outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                 value={status}
                 onChange={(event) => setStatus(event.target.value as Order["status"])}
               >
@@ -71,8 +89,13 @@ export default function AdminOrdersPage() {
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-muted-foreground">{statusHints[status]}</p>
             </div>
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            {error ? (
+              <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
             <Button type="submit" disabled={saving}>
               {saving ? "Updating..." : "Update status"}
             </Button>
@@ -80,25 +103,60 @@ export default function AdminOrdersPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="surface-card rounded-[1.75rem]">
         <CardHeader>
-          <CardTitle>Last Updated Order</CardTitle>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="eyebrow">Mutation result</p>
+              <CardTitle className="mt-2 text-3xl">Last Updated Order</CardTitle>
+            </div>
+            {order ? (
+              <Badge variant="secondary" className="capitalize">
+                {order.status}
+              </Badge>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent>
           {!order ? (
-            <p className="text-sm text-muted-foreground">No order updated yet.</p>
+            <div className="state-panel">
+              <p className="text-xl font-semibold">No order updated yet.</p>
+              <p className="max-w-md text-sm text-muted-foreground">
+                Submit an order ID and status to preview the updated order response here.
+              </p>
+            </div>
           ) : (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-medium">#{order.id}</span>
-                <Badge variant="secondary">{order.status}</Badge>
+            <div className="space-y-5">
+              <div className="rounded-2xl border border-border bg-card/70 p-4">
+                <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Order ID</p>
+                <p className="mt-2 break-all font-mono text-sm">{order.id}</p>
               </div>
-              <p className="text-sm">Total: {formatVND(order.total_amount)}</p>
-              <div className="space-y-1 text-sm text-muted-foreground">
-                {order.items.map((item) => (
-                  <p key={item.id}>
-                    {item.quantity} x {item.product.name}
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl bg-muted/60 p-4">
+                  <p className="text-sm text-muted-foreground">Current status</p>
+                  <p className="mt-2 text-lg font-semibold capitalize">{order.status}</p>
+                </div>
+                <div className="rounded-2xl bg-muted/60 p-4">
+                  <p className="text-sm text-muted-foreground">Total amount</p>
+                  <p className="mt-2 font-heading text-2xl font-semibold">
+                    {formatVND(order.total_amount)}
                   </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Items</p>
+                {order.items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/70 px-3 py-2 text-sm"
+                  >
+                    <span>
+                      {item.quantity} x {item.product.name}
+                    </span>
+                    <span className="font-medium">{formatVND(item.subtotal)}</span>
+                  </div>
                 ))}
               </div>
             </div>

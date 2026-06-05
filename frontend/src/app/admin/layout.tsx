@@ -9,21 +9,39 @@ export default function AdminLayout({
 }>) {
   return (
     <AdminGuard>
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold">Admin</h1>
-          <nav className="flex gap-4 text-sm">
-            <Link href="/admin/categories" className="hover:underline">
-              Categories
-            </Link>
-            <Link href="/admin/products" className="hover:underline">
-              Products
-            </Link>
-            <Link href="/admin/orders" className="hover:underline">
-              Orders
-            </Link>
-          </nav>
-        </div>
+      <div className="space-y-7">
+        <section className="surface-card rounded-[2rem] p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="eyebrow">Commerce operations</p>
+              <h1 className="mt-2 text-4xl font-semibold">Admin Dashboard</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                Manage catalog structure, product inventory, and order status from one focused
+                workspace.
+              </p>
+            </div>
+            <nav className="flex flex-wrap gap-2 text-sm">
+              <Link
+                href="/admin/categories"
+                className="rounded-full border border-border bg-card px-4 py-2 font-medium hover:bg-muted"
+              >
+                Categories
+              </Link>
+              <Link
+                href="/admin/products"
+                className="rounded-full border border-border bg-card px-4 py-2 font-medium hover:bg-muted"
+              >
+                Products
+              </Link>
+              <Link
+                href="/admin/orders"
+                className="rounded-full border border-border bg-card px-4 py-2 font-medium hover:bg-muted"
+              >
+                Orders
+              </Link>
+            </nav>
+          </div>
+        </section>
         {children}
       </div>
     </AdminGuard>

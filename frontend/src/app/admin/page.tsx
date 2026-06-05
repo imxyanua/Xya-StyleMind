@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const adminLinks = [
@@ -22,19 +23,27 @@ const adminLinks = [
 
 export default function AdminPage() {
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      {adminLinks.map((item) => (
-        <Link key={item.href} href={item.href}>
-          <Card className="h-full transition hover:ring-foreground/20">
-            <CardHeader>
-              <CardTitle>{item.title}</CardTitle>
-              <CardDescription>{item.description}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <span className="text-sm font-medium">Open</span>
-            </CardContent>
-          </Card>
-        </Link>
+    <div className="grid gap-5 md:grid-cols-3">
+      {adminLinks.map((item, index) => (
+        <Card
+          key={item.href}
+          className="surface-card group h-full rounded-[1.75rem] transition hover:-translate-y-1"
+        >
+          <CardHeader className="space-y-4">
+            <span className="grid size-11 place-items-center rounded-2xl bg-secondary text-sm font-semibold">
+              0{index + 1}
+            </span>
+            <div>
+              <CardTitle className="text-2xl">{item.title}</CardTitle>
+              <CardDescription className="mt-2 leading-6">{item.description}</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" className="w-full">
+              <Link href={item.href}>Open</Link>
+            </Button>
+          </CardContent>
+        </Card>
       ))}
     </div>
   );

@@ -56,13 +56,20 @@ export function AdminGuard({ children }: AdminGuardProps) {
   }, [router]);
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Checking admin access...</p>;
+    return (
+      <div className="surface-card rounded-[2rem] p-8">
+        <p className="eyebrow">Admin security</p>
+        <div className="mt-4 h-24 animate-pulse rounded-2xl bg-muted/80" />
+        <p className="mt-4 text-sm text-muted-foreground">Checking admin access...</p>
+      </div>
+    );
   }
 
   if (!allowed) {
     return (
-      <Card>
-        <CardContent className="py-8">
+      <Card className="surface-card">
+        <CardContent className="state-panel">
+          <p className="text-xl font-semibold">Access denied</p>
           <p className="text-sm text-muted-foreground">{message ?? "Access denied."}</p>
         </CardContent>
       </Card>
