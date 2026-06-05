@@ -388,7 +388,9 @@ export default function ProductDetailPage() {
         </div>
         <CardHeader>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <CardTitle>{product.name}</CardTitle>
+            <h1 className="font-heading text-3xl font-semibold leading-tight tracking-tight">
+              {product.name}
+            </h1>
             <div className="rounded-2xl border bg-muted/40 px-4 py-2 text-sm">
               <span className="font-semibold">{displayedRating.toFixed(1)}</span> / 5 ·{" "}
               {displayedReviewCount} review{displayedReviewCount === 1 ? "" : "s"}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { ProductCard } from "@/components/product/product-card";
@@ -92,12 +93,16 @@ function SearchBox({ initialValue, onSearch }: SearchBoxProps) {
   const [value, setValue] = useState(initialValue);
 
   useEffect(() => {
+    if (value.trim() === initialValue) {
+      return;
+    }
+
     const timeout = window.setTimeout(() => {
       onSearch(value.trim());
     }, 350);
 
     return () => window.clearTimeout(timeout);
-  }, [onSearch, value]);
+  }, [initialValue, onSearch, value]);
 
   return (
     <Input
@@ -128,7 +133,7 @@ function ProductsBrowser() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  function replaceParams(updates: Record<string, string | number | boolean | undefined>) {
+  function buildPathWithParams(updates: Record<string, string | number | boolean | undefined>) {
     const next = new URLSearchParams(canonicalQuery);
     for (const [key, value] of Object.entries(updates)) {
       if (value === undefined || value === "") {
@@ -138,7 +143,11 @@ function ProductsBrowser() {
       }
     }
     const query = next.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    return query ? `${pathname}?${query}` : pathname;
+  }
+
+  function replaceParams(updates: Record<string, string | number | boolean | undefined>) {
+    router.replace(buildPathWithParams(updates), { scroll: false });
   }
 
   function updateFilter(key: string, value: string | number | boolean | undefined) {
@@ -543,22 +552,33 @@ function ProductsBrowser() {
                   {meta?.total ?? products.length} products.
                 </p>
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      replaceParams({ page: Math.max(1, (meta?.page ?? 1) - 1) })
-                    }
-                    disabled={(meta?.page ?? 1) <= 1}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => replaceParams({ page: (meta?.page ?? 1) + 1 })}
-                    disabled={(meta?.page ?? 1) >= totalPages}
-                  >
-                    Next
-                  </Button>
+                  {(meta?.page ?? 1) <= 1 ? (
+                    <Button variant="outline" disabled>
+                      Previous
+                    </Button>
+                  ) : (
+                    <Button variant="outline" asChild>
+                      <Link
+                        href={buildPathWithParams({
+                          page: Math.max(1, (meta?.page ?? 1) - 1),
+                        })}
+                        scroll={false}
+                      >
+                        Previous
+                      </Link>
+                    </Button>
+                  )}
+                  {(meta?.page ?? 1) >= totalPages ? (
+                    <Button variant="outline" disabled>
+                      Next
+                    </Button>
+                  ) : (
+                    <Button variant="outline" asChild>
+                      <Link href={buildPathWithParams({ page: (meta?.page ?? 1) + 1 })} scroll={false}>
+                        Next
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               </div>
             </>

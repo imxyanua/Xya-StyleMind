@@ -19,9 +19,9 @@ type Handler struct {
 func RegisterRoutes(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, service *Service) {
 	h := &Handler{service: service}
 
-	api.GET("/products/:product_id/reviews", h.ListByProduct)
-	api.GET("/products/:product_id/rating-summary", h.SummaryByProduct)
-	api.POST("/products/:product_id/reviews", authMiddleware, h.Create)
+	api.GET("/products/:id/reviews", h.ListByProduct)
+	api.GET("/products/:id/rating-summary", h.SummaryByProduct)
+	api.POST("/products/:id/reviews", authMiddleware, h.Create)
 	api.PATCH("/reviews/:id", authMiddleware, h.Update)
 	api.DELETE("/reviews/:id", authMiddleware, h.Delete)
 }
@@ -37,7 +37,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	review, err := h.service.Create(c.Request.Context(), c.GetString("user_id"), c.Param("product_id"), req)
+	review, err := h.service.Create(c.Request.Context(), c.GetString("user_id"), c.Param("id"), req)
 	if err != nil {
 		h.writeError(c, err, "failed to create review")
 		return
@@ -47,7 +47,7 @@ func (h *Handler) Create(c *gin.Context) {
 
 func (h *Handler) ListByProduct(c *gin.Context) {
 	page := pagination.Parse(c)
-	reviews, total, err := h.service.ListByProduct(c.Request.Context(), c.Param("product_id"), page.Limit, page.Offset)
+	reviews, total, err := h.service.ListByProduct(c.Request.Context(), c.Param("id"), page.Limit, page.Offset)
 	if err != nil {
 		h.writeError(c, err, "failed to fetch reviews")
 		return
@@ -56,7 +56,7 @@ func (h *Handler) ListByProduct(c *gin.Context) {
 }
 
 func (h *Handler) SummaryByProduct(c *gin.Context) {
-	summary, err := h.service.SummaryByProduct(c.Request.Context(), c.Param("product_id"))
+	summary, err := h.service.SummaryByProduct(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		h.writeError(c, err, "failed to fetch rating summary")
 		return

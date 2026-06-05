@@ -100,10 +100,9 @@ test("core ecommerce flows work against the real backend", async ({ page, reques
   await expect(page).toHaveURL(/sort=price_desc/);
 
   await page.goto("/products?limit=12");
-  const nextButton = page.getByRole("button", { name: "Next" }).last();
-  await expect(nextButton).toBeVisible();
-  if (await nextButton.isEnabled()) {
-    await nextButton.click();
+  const nextPageLink = page.getByRole("link", { name: "Next" });
+  if (await nextPageLink.isVisible()) {
+    await nextPageLink.click();
     await expect(page).toHaveURL(/page=2/);
   }
 
@@ -171,13 +170,13 @@ test("core ecommerce flows work against the real backend", async ({ page, reques
   await page.getByLabel("Comment").fill("Excellent E2E fit and fabric.");
   await page.getByRole("button", { name: "Submit review" }).click();
   await expect(page.getByText("Review created.")).toBeVisible();
-  await expect(page.getByText("Excellent E2E fit and fabric.")).toBeVisible();
+  await expect(page.getByText("Excellent E2E fit and fabric.").last()).toBeVisible();
 
   await page.getByLabel("Rating").selectOption("4");
   await page.getByLabel("Comment").fill("Updated E2E review after another look.");
   await page.getByRole("button", { name: "Update review" }).click();
   await expect(page.getByText("Review updated.")).toBeVisible();
-  await expect(page.getByText("Updated E2E review after another look.")).toBeVisible();
+  await expect(page.getByText("Updated E2E review after another look.").last()).toBeVisible();
 
   await page.getByRole("button", { name: "Delete review" }).click();
   await expect(page.getByText("Review deleted.")).toBeVisible();
@@ -185,7 +184,7 @@ test("core ecommerce flows work against the real backend", async ({ page, reques
   await page.goto("/products?limit=12");
   await page.getByRole("button", { name: "Add to wishlist" }).first().click();
   await page.goto("/wishlist");
-  await expect(page.getByText("Wishlist")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Wishlist" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Add to Cart" }).first()).toBeVisible();
 
   await request.post(`${API_BASE_URL}/auth/logout`, {
