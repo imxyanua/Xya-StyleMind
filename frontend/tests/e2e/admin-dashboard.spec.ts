@@ -142,6 +142,8 @@ test("admin auth protects dashboard access", async ({ page, request }) => {
   await expect(page.getByText("Admin access required.")).toBeVisible();
   await page.goto("/admin/orders");
   await expect(page.getByText("Admin access required.")).toBeVisible();
+  await page.goto("/admin/activity");
+  await expect(page.getByText("Admin access required.")).toBeVisible();
 
   await setupAdmin(page, request, suffix);
   await page.goto("/admin");
@@ -149,6 +151,7 @@ test("admin auth protects dashboard access", async ({ page, request }) => {
   await expect(page.getByRole("main").getByRole("link", { name: "Products" })).toBeVisible();
   await expect(page.getByRole("main").getByRole("link", { name: "Categories" })).toBeVisible();
   await expect(page.getByRole("main").getByRole("link", { name: "Orders" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "Activity" })).toBeVisible();
 });
 
 test("admin can create categories and manage products", async ({ page, request }) => {
@@ -262,4 +265,14 @@ test("admin can update order status and sees invalid transition errors", async (
   await page.getByLabel("Status", { exact: true }).selectOption("completed");
   await page.getByRole("button", { name: "Update status" }).click();
   await expect(page.getByText(/invalid order status transition/i)).toBeVisible();
+
+  await page.goto("/admin/activity");
+  await expect(page.getByRole("heading", { name: "Activity Log" })).toBeVisible();
+  await page.getByLabel("Action").fill("admin.order_status.update");
+  await page.getByLabel("Resource").selectOption("order");
+  await page.getByLabel("Result").selectOption("success");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page.getByText("admin.order_status.update").first()).toBeVisible();
+  await expect(page.getByText(/\"old_status\": \"pending\"/).first()).toBeVisible();
+  await expect(page.getByText(/\"new_status\": \"paid\"/).first()).toBeVisible();
 });

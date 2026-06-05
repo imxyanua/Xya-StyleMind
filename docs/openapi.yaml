@@ -618,6 +618,96 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/audit-logs:
+    get:
+      tags: [Admin]
+      summary: List admin audit activity logs
+      description: Admin only. Returns persisted audit logs for sensitive admin actions. Metadata is sanitized and does not include passwords, tokens, secrets, or raw Authorization headers.
+      operationId: listAdminAuditLogs
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: action
+          in: query
+          schema:
+            type: string
+          example: admin.order_status.update
+        - name: resource_type
+          in: query
+          schema:
+            type: string
+            enum: [product, category, order]
+        - name: actor_user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: result
+          in: query
+          schema:
+            type: string
+            enum: [success, failed]
+        - name: from
+          in: query
+          description: Created-at start date or RFC3339 timestamp.
+          schema:
+            type: string
+        - name: to
+          in: query
+          description: Created-at end date or RFC3339 timestamp.
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, oldest]
+            default: newest
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogListResponseEnvelope'
+              examples:
+                default:
+                  value:
+                    success: true
+                    message: ok
+                    data:
+                      - id: 9b3b9aca-3e51-4ad1-a80f-c30c0e2f41f2
+                        actor_user_id: 5c3eb7aa-a3b8-4f1f-a9d4-1e4e4e2db222
+                        actor_role: admin
+                        action: admin.order_status.update
+                        resource_type: order
+                        resource_id: 293d2e5f-b11d-4f71-85bb-fc2325c06da2
+                        result: success
+                        metadata:
+                          old_status: pending
+                          new_status: paid
+                        ip: 127.0.0.1
+                        user_agent: Mozilla/5.0
+                        request_id: req-example
+                        created_at: '2026-06-06T05:00:00Z'
+                    meta:
+                      page: 1
+                      limit: 20
+                      total: 1
+                      total_page: 1
+                      total_pages: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/wishlist:
     get:
       tags: [Wishlist]
@@ -1661,6 +1751,58 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Order'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    AuditLog:
+      type: object
+      description: Persisted admin/security activity log. Sensitive fields such as passwords, raw tokens, secrets, and Authorization headers are never stored.
+      properties:
+        id:
+          type: string
+          format: uuid
+        actor_user_id:
+          type: string
+          format: uuid
+        actor_role:
+          type: string
+          enum: [user, admin]
+        action:
+          type: string
+          example: admin.product.update
+        resource_type:
+          type: string
+          enum: [product, category, order]
+        resource_id:
+          type: string
+        result:
+          type: string
+          enum: [success, failed]
+        metadata:
+          type: object
+          additionalProperties: true
+          example:
+            product_name: Linen Overshirt
+            stock: 8
+        ip:
+          type: string
+        user_agent:
+          type: string
+        request_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    AuditLogListResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLog'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
     WishlistProduct:

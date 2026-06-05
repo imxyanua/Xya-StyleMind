@@ -332,6 +332,26 @@ export interface paths {
         patch: operations["updateOrderStatus"];
         trace?: never;
     };
+    "/api/v1/admin/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List admin audit activity logs
+         * @description Admin only. Returns persisted audit logs for sensitive admin actions. Metadata is sanitized and does not include passwords, tokens, secrets, or raw Authorization headers.
+         */
+        get: operations["listAdminAuditLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/wishlist": {
         parameters: {
             query?: never;
@@ -812,6 +832,42 @@ export interface components {
             success?: boolean;
             message?: string;
             data?: components["schemas"]["Order"][];
+            meta?: components["schemas"]["PaginationMeta"];
+        };
+        /** @description Persisted admin/security activity log. Sensitive fields such as passwords, raw tokens, secrets, and Authorization headers are never stored. */
+        AuditLog: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            actor_user_id?: string;
+            /** @enum {string} */
+            actor_role?: "user" | "admin";
+            /** @example admin.product.update */
+            action?: string;
+            /** @enum {string} */
+            resource_type?: "product" | "category" | "order";
+            resource_id?: string;
+            /** @enum {string} */
+            result?: "success" | "failed";
+            /**
+             * @example {
+             *       "product_name": "Linen Overshirt",
+             *       "stock": 8
+             *     }
+             */
+            metadata?: {
+                [key: string]: unknown;
+            };
+            ip?: string;
+            user_agent?: string;
+            request_id?: string;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        AuditLogListResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["AuditLog"][];
             meta?: components["schemas"]["PaginationMeta"];
         };
         WishlistProduct: {
@@ -1633,6 +1689,46 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listAdminAuditLogs: {
+        parameters: {
+            query?: {
+                /** @example 1 */
+                page?: components["parameters"]["PageParam"];
+                /** @example 20 */
+                limit?: components["parameters"]["LimitParam"];
+                /** @example admin.order_status.update */
+                action?: string;
+                resource_type?: "product" | "category" | "order";
+                actor_user_id?: string;
+                result?: "success" | "failed";
+                /** @description Created-at start date or RFC3339 timestamp. */
+                from?: string;
+                /** @description Created-at end date or RFC3339 timestamp. */
+                to?: string;
+                sort?: "newest" | "oldest";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Audit logs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogListResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
         };

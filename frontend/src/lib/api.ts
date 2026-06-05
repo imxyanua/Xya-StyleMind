@@ -1,4 +1,5 @@
 import { ApiError, type ApiResponse } from "@/types/api";
+import type { AuditLog } from "@/types/audit";
 import type { Cart } from "@/types/cart";
 import type { Category } from "@/types/category";
 import type { components, operations } from "@/types/openapi";
@@ -260,5 +261,23 @@ export async function updateOrderStatus(id: string, status: Order["status"]) {
   return apiRequest<Order>(`/admin/orders/${id}/status`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
+  });
+}
+
+export type AdminAuditLogListParams = NonNullable<
+  operations["listAdminAuditLogs"]["parameters"]["query"]
+>;
+
+export async function fetchAdminAuditLogs(params: AdminAuditLogListParams = {}) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+    searchParams.set(key, String(value));
+  }
+  const query = searchParams.toString();
+  return apiRequest<AuditLog[]>(`/admin/audit-logs${query ? `?${query}` : ""}`, {
+    method: "GET",
   });
 }

@@ -1,10 +1,12 @@
 package product
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
 	"strings"
+	"stylemind/internal/audit"
 	"stylemind/internal/errs"
 
 	"stylemind/pkg/pagination"
@@ -15,11 +17,24 @@ import (
 )
 
 type Handler struct {
-	service *Service
+	service productService
+	audit   audit.Recorder
 }
 
-func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, service *Service) {
-	h := &Handler{service: service}
+type productService interface {
+	List(c context.Context, filter ListFilter, limit, offset int) ([]Product, int64, error)
+	GetByID(c context.Context, id string) (*Product, error)
+	Create(c context.Context, req CreateProductRequest) (*Product, error)
+	Update(c context.Context, id string, req UpdateProductRequest) (*Product, error)
+	Delete(c context.Context, id string) error
+}
+
+func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, service productService, recorders ...audit.Recorder) {
+	var recorder audit.Recorder
+	if len(recorders) > 0 {
+		recorder = recorders[0]
+	}
+	h := &Handler{service: service, audit: recorder}
 
 	api.GET("/products", h.List)
 	api.GET("/products/:id", h.GetDetail)
@@ -72,16 +87,19 @@ func (h *Handler) GetDetail(c *gin.Context) {
 func (h *Handler) Create(c *gin.Context) {
 	var req CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		h.recordAudit(c, "admin.product.create", "", audit.ResultFailed, gin.H{"reason": "invalid_payload"})
 		response.Error(c, http.StatusBadRequest, "invalid payload")
 		return
 	}
 	if err := validator.Validate.Struct(req); err != nil {
+		h.recordAudit(c, "admin.product.create", "", audit.ResultFailed, gin.H{"reason": "validation_error", "product_name": req.Name})
 		response.Error(c, http.StatusBadRequest, "validation failed")
 		return
 	}
 
 	item, err := h.service.Create(c.Request.Context(), req)
 	if err != nil {
+		h.recordAudit(c, "admin.product.create", "", audit.ResultFailed, gin.H{"reason": safeProductAuditReason(err), "product_name": req.Name, "category_id": req.CategoryID})
 		if errors.Is(err, errs.ErrInvalidID) {
 			response.Error(c, http.StatusBadRequest, "invalid category_id")
 			return
@@ -89,22 +107,26 @@ func (h *Handler) Create(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "failed to create product")
 		return
 	}
+	h.recordAudit(c, "admin.product.create", item.ID, audit.ResultSuccess, gin.H{"product_name": item.Name, "category_id": item.CategoryID, "price": item.Price, "stock": item.Stock})
 	response.Success(c, http.StatusCreated, "product created", item)
 }
 
 func (h *Handler) Update(c *gin.Context) {
 	var req UpdateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		h.recordAudit(c, "admin.product.update", c.Param("id"), audit.ResultFailed, gin.H{"reason": "invalid_payload"})
 		response.Error(c, http.StatusBadRequest, "invalid payload")
 		return
 	}
 	if err := validator.Validate.Struct(req); err != nil {
+		h.recordAudit(c, "admin.product.update", c.Param("id"), audit.ResultFailed, gin.H{"reason": "validation_error", "product_name": req.Name})
 		response.Error(c, http.StatusBadRequest, "validation failed")
 		return
 	}
 
 	item, err := h.service.Update(c.Request.Context(), c.Param("id"), req)
 	if err != nil {
+		h.recordAudit(c, "admin.product.update", c.Param("id"), audit.ResultFailed, gin.H{"reason": safeProductAuditReason(err), "product_name": req.Name, "category_id": req.CategoryID})
 		if errors.Is(err, errs.ErrInvalidID) {
 			response.Error(c, http.StatusBadRequest, "invalid product or category id")
 			return
@@ -116,12 +138,14 @@ func (h *Handler) Update(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "failed to update product")
 		return
 	}
+	h.recordAudit(c, "admin.product.update", item.ID, audit.ResultSuccess, gin.H{"product_name": item.Name, "category_id": item.CategoryID, "price": item.Price, "stock": item.Stock})
 	response.Success(c, http.StatusOK, "product updated", item)
 }
 
 func (h *Handler) Delete(c *gin.Context) {
 	err := h.service.Delete(c.Request.Context(), c.Param("id"))
 	if err != nil {
+		h.recordAudit(c, "admin.product.delete", c.Param("id"), audit.ResultFailed, gin.H{"reason": safeProductAuditReason(err)})
 		if errors.Is(err, errs.ErrInvalidID) {
 			response.Error(c, http.StatusBadRequest, "invalid product id")
 			return
@@ -133,7 +157,26 @@ func (h *Handler) Delete(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "failed to delete product")
 		return
 	}
+	h.recordAudit(c, "admin.product.delete", c.Param("id"), audit.ResultSuccess, nil)
 	response.Success(c, http.StatusOK, "product deleted", gin.H{"id": c.Param("id")})
+}
+
+func (h *Handler) recordAudit(c *gin.Context, action, resourceID, result string, metadata map[string]any) {
+	if h.audit == nil {
+		return
+	}
+	h.audit.RecordAdmin(c, action, "product", resourceID, result, metadata)
+}
+
+func safeProductAuditReason(err error) string {
+	switch {
+	case errors.Is(err, errs.ErrInvalidID):
+		return "validation_error"
+	case errors.Is(err, errs.ErrProductNotFound):
+		return "not_found"
+	default:
+		return "internal_error"
+	}
 }
 
 func parseListFilter(c *gin.Context) (ListFilter, error) {

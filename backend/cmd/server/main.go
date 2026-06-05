@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"stylemind/internal/audit"
 	"stylemind/internal/auth"
 	"stylemind/internal/cart"
 	"stylemind/internal/category"
@@ -113,13 +114,17 @@ func main() {
 	admin := api.Group("/admin")
 	admin.Use(jwtAuth, middleware.RequireRole("admin"))
 
+	auditRepo := audit.NewRepository(db)
+	auditService := audit.NewService(auditRepo)
+	audit.RegisterRoutes(admin, auditService)
+
 	categoryRepo := category.NewRepository(db)
 	categoryService := category.NewService(categoryRepo)
-	category.RegisterRoutes(api, admin, categoryService)
+	category.RegisterRoutes(api, admin, categoryService, auditService)
 
 	productRepo := product.NewRepository(db)
 	productService := product.NewService(productRepo)
-	product.RegisterRoutes(api, admin, productService)
+	product.RegisterRoutes(api, admin, productService, auditService)
 
 	reviewRepo := review.NewRepository(db)
 	reviewService := review.NewService(reviewRepo)
@@ -135,7 +140,7 @@ func main() {
 
 	orderRepo := order.NewRepository(db)
 	orderService := order.NewService(orderRepo)
-	order.RegisterRoutes(api, admin, jwtAuth, orderService)
+	order.RegisterRoutes(api, admin, jwtAuth, orderService, auditService)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

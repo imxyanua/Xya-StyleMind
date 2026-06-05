@@ -54,6 +54,39 @@ func newProtectedOrderTestRouter(repo *fakeOrderRepository, secret string) *gin.
 	return router
 }
 
+func newProtectedOrderTestRouterWithRecorder(repo *fakeOrderRepository, secret string, recorder *fakeOrderAuditRecorder) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("request_id", "req-order-audit-1")
+		c.Next()
+	})
+	api := router.Group("/api/v1")
+	admin := api.Group("/admin")
+	tokenConfig := orderTestTokenConfig()
+	tokenConfig.Secret = secret
+	jwtAuth := middleware.JWTAuth(tokenConfig)
+	admin.Use(jwtAuth, middleware.RequireRole("admin"))
+	RegisterRoutes(api, admin, jwtAuth, NewService(repo), recorder)
+	return router
+}
+
+type recordedOrderAudit struct {
+	action       string
+	resourceType string
+	resourceID   string
+	result       string
+	metadata     map[string]any
+}
+
+type fakeOrderAuditRecorder struct {
+	events []recordedOrderAudit
+}
+
+func (r *fakeOrderAuditRecorder) RecordAdmin(_ *gin.Context, action, resourceType, resourceID, result string, metadata map[string]any) {
+	r.events = append(r.events, recordedOrderAudit{action: action, resourceType: resourceType, resourceID: resourceID, result: result, metadata: metadata})
+}
+
 func TestHandlerCheckout_EmptyCart(t *testing.T) {
 	router := newOrderTestRouter(&fakeOrderRepository{createOrderErr: errs.ErrCartEmpty})
 
@@ -466,6 +499,68 @@ func TestProtectedAdminOrderStatus_PatchAllowed(t *testing.T) {
 	}
 	if repo.lastStatus != StatusPaid {
 		t.Fatalf("repo lastStatus = %s, want paid", repo.lastStatus)
+	}
+}
+
+func TestProtectedAdminOrderStatus_WritesPersistentAudit(t *testing.T) {
+	repo := &fakeOrderRepository{currentStatus: StatusPending}
+	recorder := &fakeOrderAuditRecorder{}
+	router := newProtectedOrderTestRouterWithRecorder(repo, "test-secret", recorder)
+
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	orderID := uuid.NewString()
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/orders/"+orderID+"/status", bytes.NewBufferString(`{"status":"paid"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if len(recorder.events) != 1 {
+		t.Fatalf("audit events = %d, want 1", len(recorder.events))
+	}
+	event := recorder.events[0]
+	if event.action != "admin.order_status.update" || event.resourceType != "order" || event.resourceID != orderID || event.result != "success" {
+		t.Fatalf("event = %+v", event)
+	}
+	if event.metadata["old_status"] != StatusPending || event.metadata["new_status"] != StatusPaid {
+		t.Fatalf("metadata = %+v", event.metadata)
+	}
+}
+
+func TestProtectedAdminOrderStatusFailed_WritesPersistentAudit(t *testing.T) {
+	repo := &fakeOrderRepository{currentStatus: StatusCompleted, updateStatusErr: errs.ErrInvalidOrderStatusTransition}
+	recorder := &fakeOrderAuditRecorder{}
+	router := newProtectedOrderTestRouterWithRecorder(repo, "test-secret", recorder)
+
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	orderID := uuid.NewString()
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/orders/"+orderID+"/status", bytes.NewBufferString(`{"status":"paid"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusBadRequest, "invalid order status transition")
+	if len(recorder.events) != 1 {
+		t.Fatalf("audit events = %d, want 1", len(recorder.events))
+	}
+	event := recorder.events[0]
+	if event.action != "admin.order_status.update" || event.resourceType != "order" || event.resourceID != orderID || event.result != "failed" {
+		t.Fatalf("event = %+v", event)
+	}
+	if event.metadata["reason"] != "invalid_status_transition" {
+		t.Fatalf("metadata = %+v", event.metadata)
 	}
 }
 

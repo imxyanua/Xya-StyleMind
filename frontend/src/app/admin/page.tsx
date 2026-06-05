@@ -17,13 +17,18 @@ const adminLinks = [
   {
     href: "/admin/orders",
     title: "Orders",
-    description: "Update order status by order ID.",
+    description: "Filter orders, inspect detail, and update fulfillment status.",
+  },
+  {
+    href: "/admin/activity",
+    title: "Activity",
+    description: "Trace sensitive admin actions with actor, resource, result, and request id.",
   },
 ];
 
 export default function AdminPage() {
   return (
-    <div className="grid gap-5 md:grid-cols-3">
+    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
       {adminLinks.map((item, index) => (
         <Card
           key={item.href}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"stylemind/internal/audit"
 	"stylemind/internal/errs"
 	"stylemind/pkg/logger"
 	"time"
@@ -17,10 +18,15 @@ import (
 
 type Handler struct {
 	service *Service
+	audit   audit.Recorder
 }
 
-func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, authMiddleware gin.HandlerFunc, service *Service) {
-	h := &Handler{service: service}
+func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, authMiddleware gin.HandlerFunc, service *Service, recorders ...audit.Recorder) {
+	var recorder audit.Recorder
+	if len(recorders) > 0 {
+		recorder = recorders[0]
+	}
+	h := &Handler{service: service, audit: recorder}
 
 	orders := api.Group("/orders")
 	orders.Use(authMiddleware)
@@ -135,6 +141,7 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 			"order_id": c.Param("id"),
 			"reason":   "invalid_payload",
 		})
+		h.recordAudit(c, "admin.order_status.update", c.Param("id"), audit.ResultFailed, gin.H{"reason": "invalid_payload"})
 		response.Error(c, http.StatusBadRequest, "invalid payload")
 		return
 	}
@@ -144,6 +151,7 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 			"new_status": req.Status,
 			"reason":     "validation_error",
 		})
+		h.recordAudit(c, "admin.order_status.update", c.Param("id"), audit.ResultFailed, gin.H{"new_status": req.Status, "reason": "validation_error"})
 		response.Error(c, http.StatusBadRequest, "validation failed")
 		return
 	}
@@ -155,6 +163,7 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 			"new_status": req.Status,
 			"reason":     safeOrderAuditReason(err),
 		})
+		h.recordAudit(c, "admin.order_status.update", c.Param("id"), audit.ResultFailed, gin.H{"new_status": req.Status, "reason": safeOrderAuditReason(err)})
 		if errors.Is(err, errs.ErrInvalidID) {
 			response.Error(c, http.StatusBadRequest, "invalid order id")
 			return
@@ -175,6 +184,7 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 			"new_status": req.Status,
 			"reason":     safeOrderAuditReason(err),
 		})
+		h.recordAudit(c, "admin.order_status.update", c.Param("id"), audit.ResultFailed, gin.H{"old_status": currentOrder.Status, "new_status": req.Status, "reason": safeOrderAuditReason(err)})
 		if errors.Is(err, errs.ErrInvalidID) {
 			response.Error(c, http.StatusBadRequest, "invalid order id")
 			return
@@ -199,7 +209,15 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 		"old_status": currentOrder.Status,
 		"new_status": order.Status,
 	})
+	h.recordAudit(c, "admin.order_status.update", order.ID, audit.ResultSuccess, gin.H{"old_status": currentOrder.Status, "new_status": order.Status})
 	response.Success(c, http.StatusOK, "order status updated", order)
+}
+
+func (h *Handler) recordAudit(c *gin.Context, action, resourceID, result string, metadata map[string]any) {
+	if h.audit == nil {
+		return
+	}
+	h.audit.RecordAdmin(c, action, "order", resourceID, result, metadata)
 }
 
 func safeOrderAuditReason(err error) string {
