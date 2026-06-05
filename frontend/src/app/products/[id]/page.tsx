@@ -48,8 +48,10 @@ function formatDate(value?: string) {
 }
 
 function findPurchasedOrderId(orders: Order[], productId: string) {
-  return orders.find((order) =>
-    order.items.some((item) => item.product_id === productId)
+  return orders.find(
+    (order) =>
+      ["paid", "shipping", "completed"].includes(order.status) &&
+      order.items.some((item) => item.product_id === productId)
   )?.id;
 }
 

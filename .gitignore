@@ -32,9 +32,12 @@ logs/
 # Build artifacts
 node_modules/
 .next/
+.next-stale-*/
 dist/
 build/
 coverage/
+test-results/
+playwright-report/
 
 # OS files
 .DS_Store

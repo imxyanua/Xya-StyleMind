@@ -1,0 +1,55 @@
+import { defineConfig, devices } from "@playwright/test";
+
+const backendEnv = {
+  APP_ENV: "development",
+  PORT: "8080",
+  DB_HOST: "localhost",
+  DB_PORT: "5432",
+  DB_USER: "postgres",
+  DB_PASSWORD: "postgres",
+  DB_NAME: "stylemind",
+  JWT_SECRET: "change_me_for_e2e",
+  JWT_ISSUER: "stylemind-api",
+  JWT_AUDIENCE: "stylemind-web",
+  REQUEST_TIMEOUT_SECONDS: "10",
+  MAX_REQUEST_BODY_BYTES: "1048576",
+  REDIS_ADDR: "",
+  REDIS_PASSWORD: "",
+  REDIS_DB: "0",
+  CORS_ALLOWED_ORIGINS: "http://127.0.0.1:3000,http://localhost:3000",
+};
+
+export default defineConfig({
+  testDir: "./tests/e2e",
+  timeout: 90_000,
+  expect: {
+    timeout: 10_000,
+  },
+  fullyParallel: false,
+  retries: 0,
+  reporter: [["list"]],
+  use: {
+    baseURL: "http://127.0.0.1:3000",
+    trace: "retain-on-failure",
+    ...devices["Desktop Chrome"],
+  },
+  webServer: [
+    {
+      command: "go run ./cmd/server",
+      cwd: "../backend",
+      env: backendEnv,
+      url: "http://127.0.0.1:8080/readyz",
+      timeout: 120_000,
+      reuseExistingServer: true,
+    },
+    {
+      command: "npm.cmd run dev -- -H 127.0.0.1 -p 3000",
+      env: {
+        NEXT_PUBLIC_API_BASE_URL: "http://127.0.0.1:8080/api/v1",
+      },
+      url: "http://127.0.0.1:3000",
+      timeout: 120_000,
+      reuseExistingServer: true,
+    },
+  ],
+});
