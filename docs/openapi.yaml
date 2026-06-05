@@ -618,6 +618,81 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/dashboard/stats:
+    get:
+      tags: [Admin]
+      summary: Get admin dashboard stats
+      description: Admin only. Returns aggregate ecommerce metrics without exposing password hashes, tokens, or secrets.
+      operationId: getAdminDashboardStats
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          description: Order created-at start date or RFC3339 timestamp.
+          schema:
+            type: string
+        - name: to
+          in: query
+          description: Order created-at end date or RFC3339 timestamp.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDashboardStatsResponseEnvelope'
+              examples:
+                default:
+                  value:
+                    success: true
+                    message: ok
+                    data:
+                      total_revenue: 3200000
+                      total_orders: 12
+                      total_products: 42
+                      total_users: 18
+                      orders_by_status:
+                        pending: 3
+                        paid: 2
+                        shipping: 4
+                        completed: 2
+                        cancelled: 1
+                      recent_orders:
+                        - id: 293d2e5f-b11d-4f71-85bb-fc2325c06da2
+                          user_id: 5c3eb7aa-a3b8-4f1f-a9d4-1e4e4e2db222
+                          user_email: buyer@example.com
+                          user_name: Example Buyer
+                          status: paid
+                          total_amount: 1200000
+                          created_at: '2026-06-06T05:00:00Z'
+                      low_stock_products:
+                        - id: 85d4813e-b82f-4826-984d-f2df6c1997cf
+                          name: Linen Overshirt
+                          stock: 2
+                          price: 890000
+                          image_url: https://picsum.photos/seed/stylemind/640/800
+                      revenue_by_day:
+                        - date: '2026-06-06'
+                          revenue: 3200000
+                      top_products:
+                        - id: 85d4813e-b82f-4826-984d-f2df6c1997cf
+                          name: Linen Overshirt
+                          image_url: https://picsum.photos/seed/stylemind/640/800
+                          quantity_sold: 4
+                          revenue: 3200000
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/admin/audit-logs:
     get:
       tags: [Admin]
@@ -1753,6 +1828,125 @@ components:
             $ref: '#/components/schemas/Order'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
+    OrdersByStatus:
+      type: object
+      properties:
+        pending:
+          type: integer
+          format: int64
+        paid:
+          type: integer
+          format: int64
+        shipping:
+          type: integer
+          format: int64
+        completed:
+          type: integer
+          format: int64
+        cancelled:
+          type: integer
+          format: int64
+    DashboardRecentOrder:
+      type: object
+      description: Minimal recent order row for admin dashboard. Does not include password hashes or tokens.
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        user_email:
+          type: string
+          format: email
+        user_name:
+          type: string
+        status:
+          type: string
+          enum: [pending, paid, shipping, completed, cancelled]
+        total_amount:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+    DashboardLowStockProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        stock:
+          type: integer
+        price:
+          type: number
+        image_url:
+          type: string
+    DashboardRevenueByDay:
+      type: object
+      properties:
+        date:
+          type: string
+          example: '2026-06-06'
+        revenue:
+          type: number
+    DashboardTopProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        image_url:
+          type: string
+        quantity_sold:
+          type: integer
+          format: int64
+        revenue:
+          type: number
+    AdminDashboardStats:
+      type: object
+      properties:
+        total_revenue:
+          type: number
+        total_orders:
+          type: integer
+          format: int64
+        total_products:
+          type: integer
+          format: int64
+        total_users:
+          type: integer
+          format: int64
+        orders_by_status:
+          $ref: '#/components/schemas/OrdersByStatus'
+        recent_orders:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardRecentOrder'
+        low_stock_products:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardLowStockProduct'
+        revenue_by_day:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardRevenueByDay'
+        top_products:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardTopProduct'
+    AdminDashboardStatsResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/AdminDashboardStats'
     AuditLog:
       type: object
       description: Persisted admin/security activity log. Sensitive fields such as passwords, raw tokens, secrets, and Authorization headers are never stored.

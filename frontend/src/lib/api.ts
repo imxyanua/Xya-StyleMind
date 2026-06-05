@@ -2,6 +2,7 @@ import { ApiError, type ApiResponse } from "@/types/api";
 import type { AuditLog } from "@/types/audit";
 import type { Cart } from "@/types/cart";
 import type { Category } from "@/types/category";
+import type { AdminDashboardStats } from "@/types/dashboard";
 import type { components, operations } from "@/types/openapi";
 import type { Order } from "@/types/order";
 import type { Product } from "@/types/product";
@@ -280,4 +281,23 @@ export async function fetchAdminAuditLogs(params: AdminAuditLogListParams = {}) 
   return apiRequest<AuditLog[]>(`/admin/audit-logs${query ? `?${query}` : ""}`, {
     method: "GET",
   });
+}
+
+export type AdminDashboardStatsParams = NonNullable<
+  operations["getAdminDashboardStats"]["parameters"]["query"]
+>;
+
+export async function fetchAdminDashboardStats(params: AdminDashboardStatsParams = {}) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+    searchParams.set(key, String(value));
+  }
+  const query = searchParams.toString();
+  return apiRequest<AdminDashboardStats>(
+    `/admin/dashboard/stats${query ? `?${query}` : ""}`,
+    { method: "GET" }
+  );
 }

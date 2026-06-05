@@ -148,10 +148,15 @@ test("admin auth protects dashboard access", async ({ page, request }) => {
   await setupAdmin(page, request, suffix);
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Admin Dashboard" })).toBeVisible();
-  await expect(page.getByRole("main").getByRole("link", { name: "Products" })).toBeVisible();
-  await expect(page.getByRole("main").getByRole("link", { name: "Categories" })).toBeVisible();
-  await expect(page.getByRole("main").getByRole("link", { name: "Orders" })).toBeVisible();
-  await expect(page.getByRole("main").getByRole("link", { name: "Activity" })).toBeVisible();
+  await expect(page.getByText("Revenue").first()).toBeVisible();
+  await expect(page.getByText("Orders by Status")).toBeVisible();
+  await expect(page.getByText("Revenue by Day")).toBeVisible();
+  await expect(page.getByText("Recent Orders")).toBeVisible();
+  await expect(page.getByText("Low-Stock Products")).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "Products", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "Categories", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "Orders", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "Activity", exact: true }).first()).toBeVisible();
 });
 
 test("admin can create categories and manage products", async ({ page, request }) => {

@@ -15,6 +15,7 @@ import (
 	"stylemind/internal/cart"
 	"stylemind/internal/category"
 	"stylemind/internal/config"
+	"stylemind/internal/dashboard"
 	"stylemind/internal/database"
 	"stylemind/internal/health"
 	"stylemind/internal/middleware"
@@ -117,6 +118,10 @@ func main() {
 	auditRepo := audit.NewRepository(db)
 	auditService := audit.NewService(auditRepo)
 	audit.RegisterRoutes(admin, auditService)
+
+	dashboardRepo := dashboard.NewRepository(db)
+	dashboardService := dashboard.NewService(dashboardRepo)
+	dashboard.RegisterRoutes(admin, dashboardService)
 
 	categoryRepo := category.NewRepository(db)
 	categoryService := category.NewService(categoryRepo)

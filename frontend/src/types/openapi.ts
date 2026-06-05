@@ -332,6 +332,26 @@ export interface paths {
         patch: operations["updateOrderStatus"];
         trace?: never;
     };
+    "/api/v1/admin/dashboard/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get admin dashboard stats
+         * @description Admin only. Returns aggregate ecommerce metrics without exposing password hashes, tokens, or secrets.
+         */
+        get: operations["getAdminDashboardStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/audit-logs": {
         parameters: {
             query?: never;
@@ -833,6 +853,74 @@ export interface components {
             message?: string;
             data?: components["schemas"]["Order"][];
             meta?: components["schemas"]["PaginationMeta"];
+        };
+        OrdersByStatus: {
+            /** Format: int64 */
+            pending?: number;
+            /** Format: int64 */
+            paid?: number;
+            /** Format: int64 */
+            shipping?: number;
+            /** Format: int64 */
+            completed?: number;
+            /** Format: int64 */
+            cancelled?: number;
+        };
+        /** @description Minimal recent order row for admin dashboard. Does not include password hashes or tokens. */
+        DashboardRecentOrder: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            user_id?: string;
+            /** Format: email */
+            user_email?: string;
+            user_name?: string;
+            /** @enum {string} */
+            status?: "pending" | "paid" | "shipping" | "completed" | "cancelled";
+            total_amount?: number;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        DashboardLowStockProduct: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            stock?: number;
+            price?: number;
+            image_url?: string;
+        };
+        DashboardRevenueByDay: {
+            /** @example 2026-06-06 */
+            date?: string;
+            revenue?: number;
+        };
+        DashboardTopProduct: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            image_url?: string;
+            /** Format: int64 */
+            quantity_sold?: number;
+            revenue?: number;
+        };
+        AdminDashboardStats: {
+            total_revenue?: number;
+            /** Format: int64 */
+            total_orders?: number;
+            /** Format: int64 */
+            total_products?: number;
+            /** Format: int64 */
+            total_users?: number;
+            orders_by_status?: components["schemas"]["OrdersByStatus"];
+            recent_orders?: components["schemas"]["DashboardRecentOrder"][];
+            low_stock_products?: components["schemas"]["DashboardLowStockProduct"][];
+            revenue_by_day?: components["schemas"]["DashboardRevenueByDay"][];
+            top_products?: components["schemas"]["DashboardTopProduct"][];
+        };
+        AdminDashboardStatsResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["AdminDashboardStats"];
         };
         /** @description Persisted admin/security activity log. Sensitive fields such as passwords, raw tokens, secrets, and Authorization headers are never stored. */
         AuditLog: {
@@ -1689,6 +1777,36 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getAdminDashboardStats: {
+        parameters: {
+            query?: {
+                /** @description Order created-at start date or RFC3339 timestamp. */
+                from?: string;
+                /** @description Order created-at end date or RFC3339 timestamp. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dashboard stats */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDashboardStatsResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
         };
