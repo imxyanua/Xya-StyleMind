@@ -164,10 +164,52 @@ Run integration tests with PostgreSQL:
 
 ```bash
 cd backend
-TEST_DATABASE_URL="postgres://postgres:postgres@localhost:5432/stylemind?sslmode=disable" go test -tags=integration ./internal/order ./internal/auth ./internal/product ./internal/cart
+TEST_DATABASE_URL="postgres://postgres:postgres@localhost:5432/stylemind?sslmode=disable" go test -tags=integration ./internal/order ./internal/auth ./internal/product ./internal/cart ./internal/wishlist ./internal/review
 ```
 
-Integration tests are opt-in. If `TEST_DATABASE_URL` is not set, they skip safely. GitHub Actions runs backend unit/API tests, build verification, and integration tests against a PostgreSQL service.
+Integration tests are opt-in. If `TEST_DATABASE_URL` is not set, they skip safely.
+
+### Frontend Verification
+
+Run OpenAPI type generation, lint, typecheck, and production build:
+
+```bash
+cd frontend
+npm ci
+npm run generate:openapi
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
+Run Playwright E2E locally after PostgreSQL and Redis are available:
+
+```bash
+cd backend
+go run ./cmd/seed
+
+cd ../frontend
+npm run test:e2e
+```
+
+Playwright starts the backend and frontend dev servers automatically. For a custom test database or Redis instance, set:
+
+- `E2E_DB_HOST`
+- `E2E_DB_PORT`
+- `E2E_DB_USER`
+- `E2E_DB_PASSWORD`
+- `E2E_DB_NAME`
+- `E2E_REDIS_ADDR`
+
+### CI
+
+GitHub Actions runs the main quality gates in `.github/workflows/ci.yml`:
+
+- Backend: `go test ./...`, `go build ./...`, and integration tests with PostgreSQL/Redis services.
+- Frontend: `npm ci`, OpenAPI type generation, generated-type diff check, lint, `npx tsc --noEmit`, and `npm run build`.
+- E2E: PostgreSQL + Redis services, backend seed runner, then Playwright against real backend/frontend servers.
+
+CI uses only placeholder test environment values. No production secrets are required.
 
 ### Security & Secrets
 
