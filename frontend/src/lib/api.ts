@@ -7,6 +7,7 @@ import type { components, operations } from "@/types/openapi";
 import type { Order } from "@/types/order";
 import type { Product } from "@/types/product";
 import type { RatingSummary, Review } from "@/types/review";
+import type { AdminUser } from "@/types/user";
 import type { WishlistItem } from "@/types/wishlist";
 
 const API_BASE_URL =
@@ -280,6 +281,36 @@ export async function fetchAdminAuditLogs(params: AdminAuditLogListParams = {}) 
   const query = searchParams.toString();
   return apiRequest<AuditLog[]>(`/admin/audit-logs${query ? `?${query}` : ""}`, {
     method: "GET",
+  });
+}
+
+export type AdminUserListParams = NonNullable<
+  operations["listAdminUsers"]["parameters"]["query"]
+>;
+export type UpdateAdminUserRoleInput = components["schemas"]["UpdateUserRoleRequest"];
+
+export async function fetchAdminUsers(params: AdminUserListParams = {}) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+    searchParams.set(key, String(value));
+  }
+  const query = searchParams.toString();
+  return apiRequest<AdminUser[]>(`/admin/users${query ? `?${query}` : ""}`, {
+    method: "GET",
+  });
+}
+
+export async function fetchAdminUser(id: string) {
+  return apiRequest<AdminUser>(`/admin/users/${id}`, { method: "GET" });
+}
+
+export async function updateAdminUserRole(id: string, input: UpdateAdminUserRoleInput) {
+  return apiRequest<AdminUser>(`/admin/users/${id}/role`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
   });
 }
 

@@ -144,6 +144,8 @@ test("admin auth protects dashboard access", async ({ page, request }) => {
   await expect(page.getByText("Admin access required.")).toBeVisible();
   await page.goto("/admin/activity");
   await expect(page.getByText("Admin access required.")).toBeVisible();
+  await page.goto("/admin/users");
+  await expect(page.getByText("Admin access required.")).toBeVisible();
 
   await setupAdmin(page, request, suffix);
   await page.goto("/admin");
@@ -156,7 +158,66 @@ test("admin auth protects dashboard access", async ({ page, request }) => {
   await expect(page.getByRole("main").getByRole("link", { name: "Products", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("main").getByRole("link", { name: "Categories", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("main").getByRole("link", { name: "Orders", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "Users", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("main").getByRole("link", { name: "Activity", exact: true }).first()).toBeVisible();
+});
+
+test("admin can list users and promote or demote roles with audit logs", async ({
+  page,
+  request,
+}) => {
+  const suffix = String(Date.now());
+  const targetEmail = `managed-user-${suffix}@example.com`;
+  await registerViaApi(request, targetEmail, "E2E Managed User");
+  await setupAdmin(page, request, `users-${suffix}`);
+
+  await page.goto("/admin/users");
+  await expect(page.getByRole("heading", { name: "Admin Users" })).toBeVisible();
+  await expect(page.getByText("User List")).toBeVisible();
+
+  await page.getByLabel("Search email/name").fill(targetEmail);
+  await page.getByLabel("Role").selectOption("user");
+  await page.getByLabel("Status").selectOption("active");
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page.getByText(targetEmail)).toBeVisible();
+
+  const userRow = page
+    .getByText(targetEmail)
+    .locator(
+      "xpath=ancestor::div[.//button[normalize-space()='Promote'] and .//button[normalize-space()='Demote']][1]"
+    );
+  await expect(userRow.getByText("user")).toBeVisible();
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain(`Confirm promote ${targetEmail} to admin?`);
+    await dialog.accept();
+  });
+  await userRow.getByRole("button", { name: "Promote" }).click();
+  await expect(page.getByText(`${targetEmail} is now admin.`)).toBeVisible();
+  await page.getByLabel("Role").selectOption("admin");
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page.getByText(targetEmail)).toBeVisible();
+
+  const promotedRow = page
+    .getByText(targetEmail)
+    .locator(
+      "xpath=ancestor::div[.//button[normalize-space()='Promote'] and .//button[normalize-space()='Demote']][1]"
+    );
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain(`Confirm demote ${targetEmail} to user?`);
+    await dialog.accept();
+  });
+  await promotedRow.getByRole("button", { name: "Demote" }).click();
+  await expect(page.getByText(`${targetEmail} is now user.`)).toBeVisible();
+
+  await page.goto("/admin/activity");
+  await expect(page.getByRole("heading", { name: "Activity Log" })).toBeVisible();
+  await page.getByLabel("Action").fill("admin.user_role.update");
+  await page.getByLabel("Resource").selectOption("user");
+  await page.getByLabel("Result").selectOption("success");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page.getByText("admin.user_role.update").first()).toBeVisible();
+  await expect(page.getByText(/\"new_role\": \"admin\"|\"new_role\": \"user\"/).first()).toBeVisible();
 });
 
 test("admin can create categories and manage products", async ({ page, request }) => {

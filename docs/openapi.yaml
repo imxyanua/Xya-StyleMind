@@ -17,6 +17,7 @@ servers:
     description: Local API v1 base path
 tags:
   - name: Auth
+  - name: Admin
   - name: Categories
   - name: Products
   - name: Cart
@@ -618,6 +619,147 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/users:
+    get:
+      tags: [Admin]
+      summary: List users
+      description: Admin only. Returns safe user profiles without password hashes, tokens, or secrets.
+      operationId: listAdminUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: q
+          in: query
+          description: Search by email or full name.
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [user, admin]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, disabled]
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, oldest]
+            default: newest
+      responses:
+        '200':
+          description: User list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserListResponseEnvelope'
+              examples:
+                default:
+                  value:
+                    success: true
+                    message: ok
+                    data:
+                      - id: 5c3eb7aa-a3b8-4f1f-a9d4-1e4e4e2db222
+                        email: user@example.com
+                        full_name: Linh Nguyen
+                        role: user
+                        status: active
+                        created_at: '2026-06-06T05:00:00Z'
+                        updated_at: '2026-06-06T05:00:00Z'
+                    meta:
+                      page: 1
+                      limit: 20
+                      total: 1
+                      total_page: 1
+                      total_pages: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/users/{id}:
+    get:
+      tags: [Admin]
+      summary: Get user detail
+      description: Admin only. Does not expose password hashes, tokens, or secrets.
+      operationId: getAdminUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIDPath'
+      responses:
+        '200':
+          description: User detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/users/{id}/role:
+    patch:
+      tags: [Admin]
+      summary: Update user role
+      description: Admin only. Role is allowlisted to `user` or `admin`. The last admin cannot demote themselves.
+      operationId: updateAdminUserRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRoleRequest'
+            examples:
+              promote:
+                value:
+                  role: admin
+              demote:
+                value:
+                  role: user
+      responses:
+        '200':
+          description: User role updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/admin/dashboard/stats:
     get:
       tags: [Admin]
@@ -713,7 +855,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [product, category, order]
+            enum: [product, category, order, user]
         - name: actor_user_id
           in: query
           schema:
@@ -1267,6 +1409,13 @@ components:
       schema:
         type: string
         format: uuid
+    UserIDPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     ReviewIDPath:
       name: id
       in: path
@@ -1489,6 +1638,60 @@ components:
           example: authorized
         data:
           $ref: '#/components/schemas/MeData'
+    AdminUser:
+      type: object
+      description: Safe admin-facing user profile. Password hashes, tokens, and secrets are never returned.
+      required: [id, email, full_name, role, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        status:
+          type: string
+          enum: [active, disabled]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UpdateUserRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [user, admin]
+    AdminUserResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/AdminUser'
+    AdminUserListResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUser'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
     NullableSuccessEnvelope:
       type: object
       required: [success, message]
@@ -1965,7 +2168,7 @@ components:
           example: admin.product.update
         resource_type:
           type: string
-          enum: [product, category, order]
+          enum: [product, category, order, user]
         resource_id:
           type: string
         result:

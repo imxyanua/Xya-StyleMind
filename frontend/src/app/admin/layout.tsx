@@ -40,6 +40,12 @@ export default function AdminLayout({
                 Orders
               </Link>
               <Link
+                href="/admin/users"
+                className="rounded-full border border-border bg-card px-4 py-2 font-medium hover:bg-muted"
+              >
+                Users
+              </Link>
+              <Link
                 href="/admin/activity"
                 className="rounded-full border border-border bg-card px-4 py-2 font-medium hover:bg-muted"
               >

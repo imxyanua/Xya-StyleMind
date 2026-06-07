@@ -332,6 +332,66 @@ export interface paths {
         patch: operations["updateOrderStatus"];
         trace?: never;
     };
+    "/api/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List users
+         * @description Admin only. Returns safe user profiles without password hashes, tokens, or secrets.
+         */
+        get: operations["listAdminUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get user detail
+         * @description Admin only. Does not expose password hashes, tokens, or secrets.
+         */
+        get: operations["getAdminUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update user role
+         * @description Admin only. Role is allowlisted to `user` or `admin`. The last admin cannot demote themselves.
+         */
+        patch: operations["updateAdminUserRole"];
+        trace?: never;
+    };
     "/api/v1/admin/dashboard/stats": {
         parameters: {
             query?: never;
@@ -666,6 +726,37 @@ export interface components {
             message: string;
             data: components["schemas"]["MeData"];
         };
+        /** @description Safe admin-facing user profile. Password hashes, tokens, and secrets are never returned. */
+        AdminUser: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            email: string;
+            full_name: string;
+            /** @enum {string} */
+            role: "user" | "admin";
+            /** @enum {string} */
+            status: "active" | "disabled";
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        UpdateUserRoleRequest: {
+            /** @enum {string} */
+            role: "user" | "admin";
+        };
+        AdminUserResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["AdminUser"];
+        };
+        AdminUserListResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["AdminUser"][];
+            meta?: components["schemas"]["PaginationMeta"];
+        };
         NullableSuccessEnvelope: {
             /** @example true */
             success: boolean;
@@ -933,7 +1024,7 @@ export interface components {
             /** @example admin.product.update */
             action?: string;
             /** @enum {string} */
-            resource_type?: "product" | "category" | "order";
+            resource_type?: "product" | "category" | "order" | "user";
             resource_id?: string;
             /** @enum {string} */
             result?: "success" | "failed";
@@ -1204,6 +1295,7 @@ export interface components {
         ProductIDPath: string;
         ProductIDPathProductID: string;
         OrderIDPath: string;
+        UserIDPath: string;
         ReviewIDPath: string;
     };
     requestBodies: never;
@@ -1781,6 +1873,102 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
+    listAdminUsers: {
+        parameters: {
+            query?: {
+                /** @example 1 */
+                page?: components["parameters"]["PageParam"];
+                /** @example 20 */
+                limit?: components["parameters"]["LimitParam"];
+                /** @description Search by email or full name. */
+                q?: string;
+                role?: "user" | "admin";
+                status?: "active" | "disabled";
+                sort?: "newest" | "oldest";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserListResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getAdminUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["UserIDPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateAdminUserRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["UserIDPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description User role updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     getAdminDashboardStats: {
         parameters: {
             query?: {
@@ -1820,7 +2008,7 @@ export interface operations {
                 limit?: components["parameters"]["LimitParam"];
                 /** @example admin.order_status.update */
                 action?: string;
-                resource_type?: "product" | "category" | "order";
+                resource_type?: "product" | "category" | "order" | "user";
                 actor_user_id?: string;
                 result?: "success" | "failed";
                 /** @description Created-at start date or RFC3339 timestamp. */

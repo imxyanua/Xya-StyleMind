@@ -12,7 +12,7 @@ import type { AuditLog } from "@/types/audit";
 
 type FilterState = {
   action: string;
-  resourceType: "" | "product" | "category" | "order";
+  resourceType: "" | "product" | "category" | "order" | "user";
   result: "" | "success" | "failed";
   from: string;
   to: string;
@@ -34,6 +34,7 @@ const commonActions = [
   "admin.product.delete",
   "admin.category.create",
   "admin.order_status.update",
+  "admin.user_role.update",
 ];
 
 function buildParams(filters: FilterState, page: number): AdminAuditLogListParams {
@@ -182,6 +183,7 @@ export default function AdminActivityPage() {
                   <option value="product">Product</option>
                   <option value="category">Category</option>
                   <option value="order">Order</option>
+                  <option value="user">User</option>
                 </select>
               </div>
               <div className="space-y-2">
