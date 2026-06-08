@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   fetchAdminUser,
@@ -208,7 +208,7 @@ export default function AdminUsersPage() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="eyebrow">Identity operations</p>
-                <CardTitle className="mt-2 text-3xl">Admin Users</CardTitle>
+                <h1 className="mt-2 font-heading text-3xl font-semibold">Admin Users</h1>
                 <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
                   Review customer/admin accounts and promote or demote roles with persisted audit
                   trails.
@@ -409,7 +409,7 @@ export default function AdminUsersPage() {
         <Card className="surface-card rounded-[1.75rem]">
           <CardHeader>
             <p className="eyebrow">Selected account</p>
-            <CardTitle className="text-3xl">User Detail</CardTitle>
+            <h2 className="font-heading text-3xl font-semibold">User Detail</h2>
           </CardHeader>
           <CardContent>
             {detailLoading ? <div className="h-44 animate-pulse rounded-2xl bg-muted/80" /> : null}

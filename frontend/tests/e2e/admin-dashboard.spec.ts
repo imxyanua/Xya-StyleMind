@@ -179,14 +179,17 @@ test("admin can list users and promote or demote roles with audit logs", async (
   await page.getByLabel("Role").selectOption("user");
   await page.getByLabel("Status").selectOption("active");
   await page.getByRole("button", { name: "Apply filters" }).click();
-  await expect(page.getByText(targetEmail)).toBeVisible();
+  await expect(page.getByText(targetEmail).first()).toBeVisible();
 
   const userRow = page
     .getByText(targetEmail)
+    .first()
     .locator(
       "xpath=ancestor::div[.//button[normalize-space()='Promote'] and .//button[normalize-space()='Demote']][1]"
     );
-  await expect(userRow.getByText("user")).toBeVisible();
+  await expect(userRow.getByText("user", { exact: true })).toBeVisible();
+  await expect(userRow.getByRole("button", { name: "Promote" })).toBeEnabled();
+  await expect(userRow.getByRole("button", { name: "Demote" })).toBeDisabled();
 
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain(`Confirm promote ${targetEmail} to admin?`);
@@ -196,13 +199,17 @@ test("admin can list users and promote or demote roles with audit logs", async (
   await expect(page.getByText(`${targetEmail} is now admin.`)).toBeVisible();
   await page.getByLabel("Role").selectOption("admin");
   await page.getByRole("button", { name: "Apply filters" }).click();
-  await expect(page.getByText(targetEmail)).toBeVisible();
+  await expect(page.getByText(targetEmail).first()).toBeVisible();
 
   const promotedRow = page
     .getByText(targetEmail)
+    .first()
     .locator(
       "xpath=ancestor::div[.//button[normalize-space()='Promote'] and .//button[normalize-space()='Demote']][1]"
     );
+  await expect(promotedRow.getByText("admin", { exact: true })).toBeVisible();
+  await expect(promotedRow.getByRole("button", { name: "Promote" })).toBeDisabled();
+  await expect(promotedRow.getByRole("button", { name: "Demote" })).toBeEnabled();
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain(`Confirm demote ${targetEmail} to user?`);
     await dialog.accept();
