@@ -20,6 +20,23 @@
     --ring: 111 129 96;
   }
 
+  .dark {
+    --background: 20 22 18;
+    --foreground: 244 239 229;
+    --card: 30 32 27;
+    --card-foreground: 244 239 229;
+    --muted: 45 48 40;
+    --muted-foreground: 177 169 154;
+    --primary: 206 222 184;
+    --primary-foreground: 25 30 22;
+    --secondary: 61 67 52;
+    --secondary-foreground: 244 239 229;
+    --destructive: 236 99 99;
+    --border: 76 79 68;
+    --input: 63 66 56;
+    --ring: 171 193 146;
+  }
+
   * {
     @apply box-border;
   }
@@ -35,6 +52,13 @@
       radial-gradient(circle at 88% 4%, rgb(196 216 184 / 0.35), transparent 24rem),
       linear-gradient(135deg, rgb(247 243 234), rgb(239 234 224));
     background-attachment: fixed;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(circle at 12% 8%, rgb(116 139 92 / 0.18), transparent 28rem),
+      radial-gradient(circle at 88% 4%, rgb(206 222 184 / 0.11), transparent 24rem),
+      linear-gradient(135deg, rgb(20 22 18), rgb(27 29 24));
   }
 
   h1,
