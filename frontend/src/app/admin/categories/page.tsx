@@ -76,7 +76,7 @@ export default function AdminCategoriesPage() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+    <div className="grid min-w-0 gap-6 lg:grid-cols-[380px_minmax(0,1fr)]">
       <Card className="surface-card h-fit rounded-[1.75rem] lg:sticky lg:top-28">
         <CardHeader>
           <p className="eyebrow">Catalog taxonomy</p>

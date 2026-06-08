@@ -17,19 +17,19 @@ export default function RootLayout({
     <html lang="en" data-scroll-behavior="smooth">
       <body>
         <header className="sticky top-0 z-40 border-b border-border/70 bg-background/82 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <Link href="/" className="group flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-2xl bg-primary text-sm font-semibold text-primary-foreground shadow-soft">
+          <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:py-4 lg:flex-row lg:items-center lg:justify-between">
+            <Link href="/" className="group flex min-w-0 items-center gap-3">
+              <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-primary text-sm font-semibold text-primary-foreground shadow-soft">
                 XS
               </span>
-              <span className="leading-tight">
+              <span className="min-w-0 leading-tight">
                 <span className="block font-heading text-2xl font-semibold">Xya-StyleMind</span>
                 <span className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
                   AI fashion commerce
                 </span>
               </span>
             </Link>
-            <nav className="flex flex-wrap items-center gap-2 text-sm">
+            <nav className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 text-sm sm:flex-wrap sm:overflow-visible sm:pb-0">
               <Link href="/products" className="rounded-full px-3 py-1.5 hover:bg-muted">
                 Products
               </Link>
@@ -57,7 +57,7 @@ export default function RootLayout({
             </nav>
           </div>
         </header>
-        <main className="mx-auto max-w-7xl px-4 py-8 sm:py-10">{children}</main>
+        <main className="mx-auto min-w-0 max-w-7xl overflow-x-hidden px-4 py-8 sm:py-10">{children}</main>
       </body>
     </html>
   );

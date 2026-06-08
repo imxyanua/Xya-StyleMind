@@ -214,7 +214,7 @@ export default function AdminOrdersPage() {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+    <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
       <div className="space-y-6">
         <Card className="surface-card rounded-[1.75rem]">
           <CardHeader>
@@ -356,7 +356,7 @@ export default function AdminOrdersPage() {
             ) : null}
 
             {!loading && orders.length > 0 ? (
-              <div className="overflow-hidden rounded-2xl border border-border">
+              <div className="overflow-x-auto rounded-2xl border border-border">
                 <div className="hidden grid-cols-[1.2fr_1fr_110px_120px] gap-4 bg-muted/60 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground lg:grid">
                   <span>Order</span>
                   <span>Customer</span>
@@ -368,14 +368,14 @@ export default function AdminOrdersPage() {
                     <button
                       key={order.id}
                       type="button"
-                      className="grid w-full gap-4 p-4 text-left transition hover:bg-muted/50 lg:grid-cols-[1.2fr_1fr_110px_120px] lg:items-center"
+                      className="grid w-full min-w-0 gap-4 p-4 text-left transition hover:bg-muted/50 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_110px_120px] lg:items-center"
                       onClick={() => order.id && loadOrderDetail(order.id)}
                     >
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-mono text-sm font-semibold">{shortID(order.id)}</p>
                         <p className="mt-1 text-xs text-muted-foreground">{formatDate(order.created_at)}</p>
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-medium">
                           {order.user?.full_name || order.user?.email || order.user_id}
                         </p>

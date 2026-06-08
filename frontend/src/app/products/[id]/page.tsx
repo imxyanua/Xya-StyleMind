@@ -394,7 +394,7 @@ export default function ProductDetailPage() {
         </div>
         <CardHeader className="p-6 sm:p-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <h1 className="font-heading text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+            <h1 className="min-w-0 font-heading text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
               {product.name}
             </h1>
             <div className="rounded-2xl border border-border bg-muted/50 px-4 py-2 text-sm shadow-sm">
@@ -442,7 +442,7 @@ export default function ProductDetailPage() {
         </CardContent>
       </Card>
 
-      <section className="grid gap-6 lg:grid-cols-[360px_1fr]">
+      <section className="grid min-w-0 gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
         <Card className="surface-card rounded-[1.75rem]">
           <CardHeader>
             <CardTitle className="text-2xl">Rating summary</CardTitle>

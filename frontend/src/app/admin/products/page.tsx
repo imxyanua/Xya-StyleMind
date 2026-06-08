@@ -187,7 +187,7 @@ export default function AdminProductsPage() {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+    <div className="grid min-w-0 gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
       <Card className="surface-card h-fit rounded-[1.75rem] xl:sticky xl:top-28">
         <CardHeader>
           <p className="eyebrow">{editingId ? "Edit catalog item" : "New catalog item"}</p>
@@ -369,7 +369,7 @@ export default function AdminProductsPage() {
           ) : null}
 
           {!loading && products.length > 0 ? (
-            <div className="overflow-hidden rounded-2xl border border-border">
+            <div className="overflow-x-auto rounded-2xl border border-border">
               <div className="hidden grid-cols-[1.8fr_1fr_120px_180px] gap-4 bg-muted/60 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground lg:grid">
                 <span>Product</span>
                 <span>Category</span>
@@ -380,9 +380,9 @@ export default function AdminProductsPage() {
                 {products.map((product) => (
                   <div
                     key={product.id}
-                    className="grid gap-4 p-4 lg:grid-cols-[1.8fr_1fr_120px_180px] lg:items-center"
+                    className="grid min-w-0 gap-4 p-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_120px_180px] lg:items-center"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
                       <div className="relative size-16 shrink-0 overflow-hidden rounded-2xl bg-muted">
                         <Image
                           src={product.image_url}
@@ -394,8 +394,8 @@ export default function AdminProductsPage() {
                           blurDataURL={PRODUCT_IMAGE_BLUR}
                         />
                       </div>
-                      <div>
-                        <p className="font-heading text-xl font-semibold">{product.name}</p>
+                      <div className="min-w-0">
+                        <p className="truncate font-heading text-xl font-semibold">{product.name}</p>
                         <p className="text-sm text-muted-foreground">{formatVND(product.price)}</p>
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           <Badge variant="secondary">{product.style}</Badge>

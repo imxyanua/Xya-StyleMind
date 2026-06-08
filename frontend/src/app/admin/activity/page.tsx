@@ -146,7 +146,7 @@ export default function AdminActivityPage() {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.8fr_1.6fr]">
+    <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.6fr)]">
       <Card className="surface-card rounded-[1.75rem]">
         <CardHeader>
           <p className="eyebrow">Traceability</p>

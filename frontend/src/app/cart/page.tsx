@@ -179,12 +179,12 @@ export default function CartPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-4">
             {cart?.items.map((item) => (
               <Card key={item.id} className="surface-card overflow-hidden rounded-[1.5rem]">
                 <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-4">
+                  <div className="flex min-w-0 items-center gap-4">
                     <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-2xl bg-muted">
                       <Image
                         src={item.product.image_url}
@@ -196,8 +196,8 @@ export default function CartPage() {
                         blurDataURL={PRODUCT_IMAGE_BLUR}
                       />
                     </div>
-                    <div className="space-y-1">
-                      <p className="font-heading text-xl font-semibold">{item.product.name}</p>
+                    <div className="min-w-0 space-y-1">
+                      <p className="break-words font-heading text-xl font-semibold">{item.product.name}</p>
                       <p className="text-sm text-muted-foreground">
                         {item.product.style} / {item.product.color}
                       </p>
@@ -206,7 +206,7 @@ export default function CartPage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
                     <input
                       type="number"
                       min={1}

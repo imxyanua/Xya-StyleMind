@@ -275,7 +275,7 @@ function ProductsBrowser() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(255,255,255,0.9),transparent_22rem),radial-gradient(circle_at_88%_0%,rgba(95,115,78,0.18),transparent_22rem)]" />
         <div className="relative max-w-4xl space-y-4">
           <p className="eyebrow">Product discovery</p>
-          <h1 className="text-4xl font-semibold leading-none sm:text-6xl">
+          <h1 className="text-3xl font-semibold leading-tight sm:text-5xl lg:text-6xl">
             Search the catalog by mood, price, rating, and stock.
           </h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
@@ -284,7 +284,7 @@ function ProductsBrowser() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+      <div className="grid min-w-0 gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="lg:sticky lg:top-6 lg:self-start">
           <Card className="surface-card rounded-[1.75rem]">
             <CardHeader className="space-y-2">
@@ -504,7 +504,7 @@ function ProductsBrowser() {
           ) : null}
 
           {loading ? (
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid min-w-0 gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, index) => (
                 <div key={index} className="h-[470px] animate-pulse rounded-[1.75rem] bg-muted/80" />
               ))}
@@ -532,7 +532,7 @@ function ProductsBrowser() {
 
           {!loading && !error && products.length > 0 ? (
             <>
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid min-w-0 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}

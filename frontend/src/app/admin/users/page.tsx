@@ -233,7 +233,7 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+    <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
       <div className="space-y-6">
         <Card className="surface-card rounded-[1.75rem]">
           <CardHeader>
@@ -356,7 +356,7 @@ export default function AdminUsersPage() {
             ) : null}
 
             {!loading && !error && users.length > 0 ? (
-              <div className="overflow-hidden rounded-2xl border border-border">
+              <div className="overflow-x-auto rounded-2xl border border-border">
                 <div className="hidden grid-cols-[1.4fr_110px_110px_260px] gap-4 bg-muted/60 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground lg:grid">
                   <span>User</span>
                   <span>Role</span>
@@ -367,7 +367,7 @@ export default function AdminUsersPage() {
                   {users.map((user) => (
                     <div
                       key={user.id}
-                      className="grid gap-4 p-4 lg:grid-cols-[1.4fr_110px_110px_260px] lg:items-center"
+                      className="grid min-w-0 gap-4 p-4 lg:grid-cols-[minmax(0,1.4fr)_110px_110px_260px] lg:items-center"
                     >
                       <button
                         type="button"
