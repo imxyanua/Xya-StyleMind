@@ -1,21 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { OrdersDonutChart, RevenueLineChart, TopProductsBarChart } from "@/components/admin/dashboard-charts";
 import { fetchAdminDashboardStats } from "@/lib/api";
 import type { AdminDashboardStats } from "@/types/dashboard";
-
-const statusLabels = [
-  ["pending", "Pending"],
-  ["paid", "Paid"],
-  ["shipping", "Shipping"],
-  ["completed", "Completed"],
-  ["cancelled", "Cancelled"],
-] as const;
 
 const adminLinks = [
   {
@@ -129,13 +122,6 @@ export default function AdminPage() {
     };
   }, []);
 
-  const maxStatusCount = useMemo(() => {
-    if (!stats) {
-      return 1;
-    }
-    return Math.max(...statusLabels.map(([key]) => stats.orders_by_status[key] ?? 0), 1);
-  }, [stats]);
-
   if (loading) {
     return (
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -192,24 +178,10 @@ export default function AdminPage() {
           <CardHeader>
             <p className="eyebrow">Operations</p>
             <CardTitle className="text-2xl">Orders by Status</CardTitle>
-            <CardDescription>Live distribution across the order lifecycle.</CardDescription>
+            <CardDescription>Donut view of the live order lifecycle distribution.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {statusLabels.map(([key, label]) => {
-              const count = stats.orders_by_status[key] ?? 0;
-              const width = `${Math.max((count / maxStatusCount) * 100, count > 0 ? 8 : 0)}%`;
-              return (
-                <div key={key} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{label}</span>
-                    <span className="text-muted-foreground">{formatNumber(count)}</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-foreground" style={{ width }} />
-                  </div>
-                </div>
-              );
-            })}
+          <CardContent>
+            <OrdersDonutChart data={stats.orders_by_status} />
           </CardContent>
         </Card>
 
@@ -225,20 +197,7 @@ export default function AdminPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            {stats.revenue_by_day.length === 0 ? (
-              <p className="rounded-3xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                No revenue yet.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {stats.revenue_by_day.slice(0, 7).map((day) => (
-                  <div key={day.date} className="flex items-center justify-between rounded-2xl bg-muted/60 px-4 py-3 text-sm">
-                    <span className="font-medium">{day.date}</span>
-                    <span>{formatVND(day.revenue)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            <RevenueLineChart data={stats.revenue_by_day} />
           </CardContent>
         </Card>
       </section>
@@ -314,23 +273,10 @@ export default function AdminPage() {
           <CardHeader>
             <p className="eyebrow">Merchandising</p>
             <CardTitle className="text-2xl">Top Products</CardTitle>
+            <CardDescription>Revenue-ranked bar chart from checkout data.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {stats.top_products.length === 0 ? (
-              <p className="rounded-3xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                No sold products yet.
-              </p>
-            ) : (
-              stats.top_products.map((product, index) => (
-                <div key={product.id} className="flex items-center justify-between rounded-2xl bg-muted/60 px-4 py-3 text-sm">
-                  <div>
-                    <p className="font-medium">{index + 1}. {product.name}</p>
-                    <p className="text-xs text-muted-foreground">{formatNumber(product.quantity_sold ?? 0)} sold</p>
-                  </div>
-                  <span className="font-semibold">{formatVND(product.revenue)}</span>
-                </div>
-              ))
-            )}
+          <CardContent>
+            <TopProductsBarChart data={stats.top_products} />
           </CardContent>
         </Card>
 
