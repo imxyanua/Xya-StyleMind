@@ -42,6 +42,9 @@ export default function RootLayout({
               <Link href="/orders" className="rounded-full px-3 py-1.5 hover:bg-muted">
                 Orders
               </Link>
+              <Link href="/profile" className="rounded-full px-3 py-1.5 hover:bg-muted">
+                Profile
+              </Link>
               <Link href="/admin" className="rounded-full px-3 py-1.5 hover:bg-muted">
                 Admin
               </Link>

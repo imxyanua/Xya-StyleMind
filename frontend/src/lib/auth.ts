@@ -1,12 +1,14 @@
 import { apiRequest } from "@/lib/api";
 
 const TOKEN_KEY = "stylemind_token";
+const USER_KEY = "stylemind_user";
 
 export type AuthUser = {
   id: string;
   email: string;
   full_name: string;
   role: string;
+  status?: string;
 };
 
 type AuthPayload = {
@@ -43,11 +45,35 @@ export function setToken(token: string) {
   window.localStorage.setItem(TOKEN_KEY, token);
 }
 
+export function setStoredUser(user: AuthUser) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+export function getStoredUser(): AuthUser | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const raw = window.localStorage.getItem(USER_KEY);
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as AuthUser;
+  } catch {
+    window.localStorage.removeItem(USER_KEY);
+    return null;
+  }
+}
+
 export function logout() {
   if (typeof window === "undefined") {
     return;
   }
   window.localStorage.removeItem(TOKEN_KEY);
+  window.localStorage.removeItem(USER_KEY);
 }
 
 export async function register(input: RegisterInput) {
@@ -62,6 +88,9 @@ export async function register(input: RegisterInput) {
 
   if (res.data?.token) {
     setToken(res.data.token);
+  }
+  if (res.data?.user) {
+    setStoredUser(res.data.user);
   }
   return res.data;
 }
@@ -78,6 +107,9 @@ export async function login(input: LoginInput) {
 
   if (res.data?.token) {
     setToken(res.data.token);
+  }
+  if (res.data?.user) {
+    setStoredUser(res.data.user);
   }
   return res.data;
 }
