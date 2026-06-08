@@ -28,6 +28,7 @@ func RegisterRoutes(admin *gin.RouterGroup, service *Service, recorders ...audit
 	admin.GET("/users", h.List)
 	admin.GET("/users/:id", h.Get)
 	admin.PATCH("/users/:id/role", h.UpdateRole)
+	admin.PATCH("/users/:id/status", h.UpdateStatus)
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -74,12 +75,12 @@ func (h *Handler) Get(c *gin.Context) {
 func (h *Handler) UpdateRole(c *gin.Context) {
 	var req UpdateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		h.recordAudit(c, c.Param("id"), audit.ResultFailed, gin.H{"reason": "invalid_payload"})
+		h.recordAudit(c, "admin.user_role.update", c.Param("id"), audit.ResultFailed, gin.H{"reason": "invalid_payload"})
 		response.Error(c, http.StatusBadRequest, "invalid payload")
 		return
 	}
 	if err := validator.Validate.Struct(req); err != nil {
-		h.recordAudit(c, c.Param("id"), audit.ResultFailed, gin.H{"new_role": req.Role, "reason": "validation_error"})
+		h.recordAudit(c, "admin.user_role.update", c.Param("id"), audit.ResultFailed, gin.H{"new_role": req.Role, "reason": "validation_error"})
 		response.Error(c, http.StatusBadRequest, "validation failed")
 		return
 	}
@@ -90,7 +91,7 @@ func (h *Handler) UpdateRole(c *gin.Context) {
 		if oldRole != "" {
 			metadata["old_role"] = oldRole
 		}
-		h.recordAudit(c, c.Param("id"), audit.ResultFailed, metadata)
+		h.recordAudit(c, "admin.user_role.update", c.Param("id"), audit.ResultFailed, metadata)
 		switch {
 		case errors.Is(err, errs.ErrInvalidID):
 			response.Error(c, http.StatusBadRequest, "invalid user id")
@@ -108,26 +109,73 @@ func (h *Handler) UpdateRole(c *gin.Context) {
 		return
 	}
 
-	h.recordAudit(c, item.ID, audit.ResultSuccess, gin.H{"old_role": oldRole, "new_role": item.Role, "email": item.Email})
+	h.recordAudit(c, "admin.user_role.update", item.ID, audit.ResultSuccess, gin.H{"old_role": oldRole, "new_role": item.Role, "email": item.Email})
 	response.Success(c, http.StatusOK, "user role updated", item)
 }
 
-func (h *Handler) recordAudit(c *gin.Context, resourceID, result string, metadata map[string]any) {
+func (h *Handler) UpdateStatus(c *gin.Context) {
+	var req UpdateStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.recordAudit(c, "admin.user_status.update", c.Param("id"), audit.ResultFailed, gin.H{"reason": "invalid_payload"})
+		response.Error(c, http.StatusBadRequest, "invalid payload")
+		return
+	}
+	if err := validator.Validate.Struct(req); err != nil {
+		h.recordAudit(c, "admin.user_status.update", c.Param("id"), audit.ResultFailed, gin.H{"new_status": req.Status, "reason": "validation_error"})
+		response.Error(c, http.StatusBadRequest, "validation failed")
+		return
+	}
+
+	item, oldStatus, err := h.service.UpdateStatus(c.Request.Context(), c.GetString("user_id"), c.Param("id"), req.Status)
+	if err != nil {
+		metadata := gin.H{"new_status": req.Status, "reason": safeUserAuditReason(err)}
+		if oldStatus != "" {
+			metadata["old_status"] = oldStatus
+		}
+		h.recordAudit(c, "admin.user_status.update", c.Param("id"), audit.ResultFailed, metadata)
+		switch {
+		case errors.Is(err, errs.ErrInvalidID):
+			response.Error(c, http.StatusBadRequest, "invalid user id")
+		case errors.Is(err, errs.ErrInvalidUserStatus):
+			response.Error(c, http.StatusBadRequest, "invalid status")
+		case errors.Is(err, errs.ErrUnauthorized):
+			response.Error(c, http.StatusUnauthorized, "unauthorized")
+		case errors.Is(err, errs.ErrUserNotFound):
+			response.Error(c, http.StatusNotFound, "user not found")
+		case errors.Is(err, errs.ErrCannotDisableSelf):
+			response.Error(c, http.StatusConflict, "cannot disable yourself")
+		case errors.Is(err, errs.ErrCannotDisableLastAdmin):
+			response.Error(c, http.StatusConflict, "cannot disable the last admin")
+		default:
+			response.Error(c, http.StatusInternalServerError, "failed to update user status")
+		}
+		return
+	}
+
+	h.recordAudit(c, "admin.user_status.update", item.ID, audit.ResultSuccess, gin.H{"old_status": oldStatus, "new_status": item.Status, "email": item.Email})
+	response.Success(c, http.StatusOK, "user status updated", item)
+}
+
+func (h *Handler) recordAudit(c *gin.Context, action, resourceID, result string, metadata map[string]any) {
 	if h.audit == nil {
 		return
 	}
-	h.audit.RecordAdmin(c, "admin.user_role.update", "user", resourceID, result, metadata)
+	h.audit.RecordAdmin(c, action, "user", resourceID, result, metadata)
 }
 
 func safeUserAuditReason(err error) string {
 	switch {
-	case errors.Is(err, errs.ErrInvalidID), errors.Is(err, errs.ErrInvalidUserRole), errors.Is(err, errs.ErrValidationFailed):
+	case errors.Is(err, errs.ErrInvalidID), errors.Is(err, errs.ErrInvalidUserRole), errors.Is(err, errs.ErrInvalidUserStatus), errors.Is(err, errs.ErrValidationFailed):
 		return "validation_error"
 	case errors.Is(err, errs.ErrUnauthorized):
 		return "unauthorized"
 	case errors.Is(err, errs.ErrUserNotFound):
 		return "not_found"
 	case errors.Is(err, errs.ErrCannotDemoteLastAdmin):
+		return "last_admin"
+	case errors.Is(err, errs.ErrCannotDisableSelf):
+		return "self_disable"
+	case errors.Is(err, errs.ErrCannotDisableLastAdmin):
 		return "last_admin"
 	default:
 		return "internal_error"

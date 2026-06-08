@@ -197,6 +197,87 @@ func TestJWTAuth_RevocationStoreErrorFailsClosed(t *testing.T) {
 	}
 }
 
+func TestJWTAuth_DisabledUserFailsClosed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	cfg := middlewareTestTokenConfig()
+
+	r.GET("/protected", JWTAuth(cfg, WithUserStatusChecker(&fakeUserStatusChecker{
+		user: &auth.User{ID: "u1", Role: "user", Status: "disabled"},
+	})), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	token, err := auth.GenerateToken(cfg, "u1", "user")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusUnauthorized)
+	}
+	if w.Body.String() != `{"success":false,"message":"unauthorized"}` {
+		t.Fatalf("body leaked details or had wrong format: %s", w.Body.String())
+	}
+}
+
+func TestJWTAuth_ActiveUserWithStatusCheckerPasses(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	cfg := middlewareTestTokenConfig()
+
+	r.GET("/protected", JWTAuth(cfg, WithUserStatusChecker(&fakeUserStatusChecker{
+		user: &auth.User{ID: "u1", Role: "user", Status: "active"},
+	})), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	token, err := auth.GenerateToken(cfg, "u1", "user")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+}
+
+func TestJWTAuth_StatusCheckerErrorFailsClosed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	cfg := middlewareTestTokenConfig()
+
+	r.GET("/protected", JWTAuth(cfg, WithUserStatusChecker(&fakeUserStatusChecker{
+		err: errors.New("database unavailable"),
+	})), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	token, err := auth.GenerateToken(cfg, "u1", "user")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusUnauthorized)
+	}
+}
+
 func TestJWTAuth_MalformedHeader(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -306,4 +387,16 @@ func (s *failingTokenRevocationStore) IsTokenRevoked(context.Context, string) (b
 
 func (s *failingTokenRevocationStore) Close() error {
 	return nil
+}
+
+type fakeUserStatusChecker struct {
+	user *auth.User
+	err  error
+}
+
+func (c *fakeUserStatusChecker) GetUserByID(context.Context, string) (*auth.User, error) {
+	if c.err != nil {
+		return nil, c.err
+	}
+	return c.user, nil
 }

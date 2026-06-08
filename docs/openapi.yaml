@@ -760,6 +760,50 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/users/{id}/status:
+    patch:
+      tags: [Admin]
+      summary: Update user status
+      description: Admin only. Status is allowlisted to `active` or `disabled`. Admins cannot disable their own account, and the last active admin cannot be disabled.
+      operationId: updateAdminUserStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserStatusRequest'
+            examples:
+              disable:
+                value:
+                  status: disabled
+              enable:
+                value:
+                  status: active
+      responses:
+        '200':
+          description: User status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/admin/dashboard/stats:
     get:
       tags: [Admin]
@@ -1670,6 +1714,13 @@ components:
         role:
           type: string
           enum: [user, admin]
+    UpdateUserStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, disabled]
     AdminUserResponseEnvelope:
       type: object
       properties:

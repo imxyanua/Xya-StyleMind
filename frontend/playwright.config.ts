@@ -5,6 +5,11 @@ const frontendDevCommand =
     ? "npm.cmd run dev -- -H 127.0.0.1 -p 3000"
     : "npm run dev -- -H 127.0.0.1 -p 3000";
 
+const backendDevCommand =
+  process.platform === "win32"
+    ? "if not exist tmp mkdir tmp && go build -o tmp\\e2e-server.exe ./cmd/server && tmp\\e2e-server.exe"
+    : "go run ./cmd/server";
+
 const backendEnv = {
   APP_ENV: "development",
   PORT: "8080",
@@ -40,7 +45,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "go run ./cmd/server",
+      command: backendDevCommand,
       cwd: "../backend",
       env: backendEnv,
       url: "http://127.0.0.1:8080/readyz",

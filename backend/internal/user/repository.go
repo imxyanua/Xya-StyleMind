@@ -118,6 +118,61 @@ func (r *Repository) UpdateRole(ctx context.Context, actorUserID, targetUserID, 
 	return updated, current.Role, nil
 }
 
+func (r *Repository) UpdateStatus(ctx context.Context, actorUserID, targetUserID, newStatus string) (*User, string, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var current User
+	err = tx.QueryRow(ctx, `
+		SELECT id, email, full_name, role, COALESCE(status, 'active'), created_at, updated_at
+		FROM users
+		WHERE id = $1
+		FOR UPDATE
+	`, targetUserID).Scan(&current.ID, &current.Email, &current.FullName, &current.Role, &current.Status, &current.CreatedAt, &current.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, "", errs.ErrUserNotFound
+		}
+		return nil, "", err
+	}
+
+	if current.ID == actorUserID && newStatus == StatusDisabled {
+		return nil, current.Status, errs.ErrCannotDisableSelf
+	}
+	if current.Role == RoleAdmin && newStatus == StatusDisabled && current.Status == StatusActive {
+		var activeAdminCount int
+		if err := tx.QueryRow(ctx, `
+			SELECT COUNT(*)
+			FROM users
+			WHERE role = $1 AND COALESCE(status, 'active') = $2
+		`, RoleAdmin, StatusActive).Scan(&activeAdminCount); err != nil {
+			return nil, current.Status, err
+		}
+		if activeAdminCount <= 1 {
+			return nil, current.Status, errs.ErrCannotDisableLastAdmin
+		}
+	}
+
+	updated := &User{}
+	err = tx.QueryRow(ctx, `
+		UPDATE users
+		SET status = $2, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, email, full_name, role, COALESCE(status, 'active'), created_at, updated_at
+	`, targetUserID, newStatus).Scan(&updated.ID, &updated.Email, &updated.FullName, &updated.Role, &updated.Status, &updated.CreatedAt, &updated.UpdatedAt)
+	if err != nil {
+		return nil, current.Status, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, current.Status, err
+	}
+	return updated, current.Status, nil
+}
+
 func buildWhere(filter ListFilter) (string, []any) {
 	clauses := make([]string, 0)
 	args := make([]any, 0)

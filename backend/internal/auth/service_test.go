@@ -158,6 +158,54 @@ func TestServiceLogin_InvalidPassword(t *testing.T) {
 	}
 }
 
+func TestServiceLogin_DisabledUser(t *testing.T) {
+	repo := newFakeUserRepository()
+	hash, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("GenerateFromPassword error = %v", err)
+	}
+	repo.usersByEmail["user@example.com"] = &User{
+		ID:           "user-1",
+		Email:        "user@example.com",
+		PasswordHash: string(hash),
+		Role:         "user",
+		Status:       "disabled",
+	}
+	service := NewService(repo, testTokenConfig())
+
+	_, err = service.Login(context.Background(), LoginRequest{
+		Email:    "user@example.com",
+		Password: "password123",
+	})
+	if !errors.Is(err, errs.ErrUserDisabled) {
+		t.Fatalf("err = %v, want ErrUserDisabled", err)
+	}
+}
+
+func TestServiceLogin_DisabledUserWrongPasswordDoesNotRevealStatus(t *testing.T) {
+	repo := newFakeUserRepository()
+	hash, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("GenerateFromPassword error = %v", err)
+	}
+	repo.usersByEmail["user@example.com"] = &User{
+		ID:           "user-1",
+		Email:        "user@example.com",
+		PasswordHash: string(hash),
+		Role:         "user",
+		Status:       "disabled",
+	}
+	service := NewService(repo, testTokenConfig())
+
+	_, err = service.Login(context.Background(), LoginRequest{
+		Email:    "user@example.com",
+		Password: "wrong-password",
+	})
+	if !errors.Is(err, errs.ErrInvalidCredentials) {
+		t.Fatalf("err = %v, want ErrInvalidCredentials", err)
+	}
+}
+
 func TestServiceLogin_UserNotFound(t *testing.T) {
 	service := NewService(newFakeUserRepository(), testTokenConfig())
 

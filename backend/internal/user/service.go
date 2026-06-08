@@ -11,6 +11,7 @@ type RepositoryPort interface {
 	List(ctx context.Context, filter ListFilter, limit, offset int) ([]User, int64, error)
 	GetByID(ctx context.Context, id string) (*User, error)
 	UpdateRole(ctx context.Context, actorUserID, targetUserID, newRole string) (*User, string, error)
+	UpdateStatus(ctx context.Context, actorUserID, targetUserID, newStatus string) (*User, string, error)
 }
 
 type Service struct {
@@ -57,6 +58,20 @@ func (s *Service) UpdateRole(ctx context.Context, actorUserID, targetUserID, rol
 		return nil, "", errs.ErrInvalidUserRole
 	}
 	return s.repo.UpdateRole(ctx, actorUserID, targetUserID, role)
+}
+
+func (s *Service) UpdateStatus(ctx context.Context, actorUserID, targetUserID, status string) (*User, string, error) {
+	status = strings.TrimSpace(status)
+	if !IsUUID(targetUserID) {
+		return nil, "", errs.ErrInvalidID
+	}
+	if actorUserID == "" || !IsUUID(actorUserID) {
+		return nil, "", errs.ErrUnauthorized
+	}
+	if !IsValidStatus(status) {
+		return nil, "", errs.ErrInvalidUserStatus
+	}
+	return s.repo.UpdateStatus(ctx, actorUserID, targetUserID, status)
 }
 
 func IsValidRole(role string) bool {

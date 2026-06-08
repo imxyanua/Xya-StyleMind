@@ -104,7 +104,11 @@ func main() {
 	}
 	authRepo := auth.NewRepository(db)
 	authService := auth.NewService(authRepo, tokenConfig, auth.WithTokenRevocationStore(tokenRevocationStore))
-	jwtAuth := middleware.JWTAuth(tokenConfig, middleware.WithTokenRevocationStore(tokenRevocationStore))
+	jwtAuth := middleware.JWTAuth(
+		tokenConfig,
+		middleware.WithTokenRevocationStore(tokenRevocationStore),
+		middleware.WithUserStatusChecker(authRepo),
+	)
 	auth.RegisterRoutes(
 		api,
 		authService,

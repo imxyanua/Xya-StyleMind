@@ -83,6 +83,14 @@ func (h *Handler) Login(c *gin.Context) {
 			response.Error(c, http.StatusUnauthorized, "invalid email or password")
 			return
 		}
+		if errors.Is(err, errs.ErrUserDisabled) {
+			logger.Audit(c, "auth.login", logger.AuditResultFailed, map[string]any{
+				"email":  normalizedEmail(req.Email),
+				"reason": "account_disabled",
+			})
+			response.Error(c, http.StatusForbidden, "account disabled")
+			return
+		}
 		logger.Audit(c, "auth.login", logger.AuditResultFailed, map[string]any{
 			"email":  normalizedEmail(req.Email),
 			"reason": "internal_error",

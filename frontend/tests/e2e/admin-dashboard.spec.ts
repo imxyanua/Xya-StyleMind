@@ -56,6 +56,15 @@ async function apiPost<T>(
   return (await response.json()) as ApiEnvelope<T>;
 }
 
+async function loginViaApiRaw(request: APIRequestContext, email: string) {
+  return request.post(`${API_BASE_URL}/auth/login`, {
+    data: {
+      email,
+      password: PASSWORD,
+    },
+  });
+}
+
 async function registerViaApi(request: APIRequestContext, email: string, fullName = "E2E User") {
   return apiPost<AuthPayload>(request, "/auth/register", {
     email,
@@ -217,6 +226,55 @@ test("admin can list users and promote or demote roles with audit logs", async (
   await promotedRow.getByRole("button", { name: "Demote" }).click();
   await expect(page.getByText(`${targetEmail} is now user.`)).toBeVisible();
 
+  await page.getByLabel("Role").selectOption("user");
+  await page.getByLabel("Status").selectOption("active");
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page.getByText(targetEmail).first()).toBeVisible();
+
+  const activeRow = page
+    .getByText(targetEmail)
+    .first()
+    .locator(
+      "xpath=ancestor::div[.//button[normalize-space()='Enable'] and .//button[normalize-space()='Disable']][1]"
+    );
+  await expect(activeRow.getByText("active", { exact: true })).toBeVisible();
+  await expect(activeRow.getByRole("button", { name: "Enable" })).toBeDisabled();
+  await expect(activeRow.getByRole("button", { name: "Disable" })).toBeEnabled();
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain(`Confirm disable ${targetEmail}?`);
+    await dialog.accept();
+  });
+  await activeRow.getByRole("button", { name: "Disable" }).click();
+  await expect(page.getByText(`${targetEmail} is now disabled.`)).toBeVisible();
+
+  const disabledLogin = await loginViaApiRaw(request, targetEmail);
+  expect(disabledLogin.status()).toBe(403);
+  const disabledPayload = await disabledLogin.json();
+  expect(disabledPayload).toMatchObject({
+    success: false,
+    message: "account disabled",
+  });
+
+  await page.getByLabel("Status").selectOption("disabled");
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page.getByText(targetEmail).first()).toBeVisible();
+
+  const disabledRow = page
+    .getByText(targetEmail)
+    .first()
+    .locator(
+      "xpath=ancestor::div[.//button[normalize-space()='Enable'] and .//button[normalize-space()='Disable']][1]"
+    );
+  await expect(disabledRow.getByText("disabled", { exact: true })).toBeVisible();
+  await expect(disabledRow.getByRole("button", { name: "Enable" })).toBeEnabled();
+  await expect(disabledRow.getByRole("button", { name: "Disable" })).toBeDisabled();
+  await disabledRow.getByRole("button", { name: "Enable" }).click();
+  await expect(page.getByText(`${targetEmail} is now active.`)).toBeVisible();
+
+  const enabledLogin = await loginViaApiRaw(request, targetEmail);
+  expect(enabledLogin.ok(), await enabledLogin.text()).toBeTruthy();
+
   await page.goto("/admin/activity");
   await expect(page.getByRole("heading", { name: "Activity Log" })).toBeVisible();
   await page.getByLabel("Action").fill("admin.user_role.update");
@@ -225,6 +283,11 @@ test("admin can list users and promote or demote roles with audit logs", async (
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page.getByText("admin.user_role.update").first()).toBeVisible();
   await expect(page.getByText(/\"new_role\": \"admin\"|\"new_role\": \"user\"/).first()).toBeVisible();
+
+  await page.getByLabel("Action").fill("admin.user_status.update");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page.getByText("admin.user_status.update").first()).toBeVisible();
+  await expect(page.getByText(/\"new_status\": \"disabled\"|\"new_status\": \"active\"/).first()).toBeVisible();
 });
 
 test("admin can create categories and manage products", async ({ page, request }) => {

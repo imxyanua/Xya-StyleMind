@@ -10,6 +10,7 @@ import {
   fetchAdminUser,
   fetchAdminUsers,
   updateAdminUserRole,
+  updateAdminUserStatus,
   type AdminUserListParams,
 } from "@/lib/api";
 import type { PaginationMeta } from "@/types/api";
@@ -200,6 +201,37 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function changeStatus(user: AdminUser, nextStatus: UserStatus) {
+    if (user.status === nextStatus) {
+      return;
+    }
+    if (
+      nextStatus === "disabled" &&
+      !window.confirm(`Confirm disable ${user.email}? This user will no longer be able to login.`)
+    ) {
+      return;
+    }
+
+    setSavingUserId(user.id);
+    setError(null);
+    setDetailError(null);
+    setSuccess(null);
+    try {
+      const response = await updateAdminUserStatus(user.id, { status: nextStatus });
+      const updated = response.data;
+      setSuccess(`${user.email} is now ${nextStatus}.`);
+      await loadUsers(page, appliedFilters);
+      if (updated?.id) {
+        await loadUserDetail(updated.id);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update user status";
+      setDetailError(message);
+    } finally {
+      setSavingUserId(null);
+    }
+  }
+
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
       <div className="space-y-6">
@@ -325,7 +357,7 @@ export default function AdminUsersPage() {
 
             {!loading && !error && users.length > 0 ? (
               <div className="overflow-hidden rounded-2xl border border-border">
-                <div className="hidden grid-cols-[1.4fr_110px_110px_170px] gap-4 bg-muted/60 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground lg:grid">
+                <div className="hidden grid-cols-[1.4fr_110px_110px_260px] gap-4 bg-muted/60 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground lg:grid">
                   <span>User</span>
                   <span>Role</span>
                   <span>Status</span>
@@ -335,7 +367,7 @@ export default function AdminUsersPage() {
                   {users.map((user) => (
                     <div
                       key={user.id}
-                      className="grid gap-4 p-4 lg:grid-cols-[1.4fr_110px_110px_170px] lg:items-center"
+                      className="grid gap-4 p-4 lg:grid-cols-[1.4fr_110px_110px_260px] lg:items-center"
                     >
                       <button
                         type="button"
@@ -370,6 +402,24 @@ export default function AdminUsersPage() {
                           onClick={() => changeRole(user, "user")}
                         >
                           Demote
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={savingUserId === user.id || user.status === "active"}
+                          onClick={() => changeStatus(user, "active")}
+                        >
+                          Enable
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          disabled={savingUserId === user.id || user.status === "disabled"}
+                          onClick={() => changeStatus(user, "disabled")}
+                        >
+                          Disable
                         </Button>
                       </div>
                     </div>
@@ -471,6 +521,22 @@ export default function AdminUsersPage() {
                     onClick={() => changeRole(selectedUser, "user")}
                   >
                     Demote to user
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={savingUserId === selectedUser.id || selectedUser.status === "active"}
+                    onClick={() => changeStatus(selectedUser, "active")}
+                  >
+                    Enable account
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={savingUserId === selectedUser.id || selectedUser.status === "disabled"}
+                    onClick={() => changeStatus(selectedUser, "disabled")}
+                  >
+                    Disable account
                   </Button>
                 </div>
                 <p className="text-xs leading-5 text-muted-foreground">

@@ -19,13 +19,15 @@ import (
 )
 
 type fakeRepo struct {
-	items      []User
-	total      int64
-	filter     ListFilter
-	updated    *User
-	oldRole    string
-	updateErr  error
-	updateRole string
+	items        []User
+	total        int64
+	filter       ListFilter
+	updated      *User
+	oldRole      string
+	oldStatus    string
+	updateErr    error
+	updateRole   string
+	updateStatus string
 }
 
 func (r *fakeRepo) List(_ context.Context, filter ListFilter, _, _ int) ([]User, int64, error) {
@@ -63,6 +65,26 @@ func (r *fakeRepo) UpdateRole(_ context.Context, _, targetUserID, newRole string
 		}
 	}
 	return updated, r.oldRole, nil
+}
+
+func (r *fakeRepo) UpdateStatus(_ context.Context, _, targetUserID, newStatus string) (*User, string, error) {
+	r.updateStatus = newStatus
+	if r.updateErr != nil {
+		return nil, r.oldStatus, r.updateErr
+	}
+	updated := r.updated
+	if updated == nil {
+		updated = &User{
+			ID:        targetUserID,
+			Email:     "target@example.com",
+			FullName:  "Target User",
+			Role:      RoleUser,
+			Status:    newStatus,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+	}
+	return updated, r.oldStatus, nil
 }
 
 type auditEvent struct {
@@ -214,6 +236,79 @@ func TestAdminUsersUpdateRole_LastAdminConflictAudited(t *testing.T) {
 	}
 }
 
+func TestAdminUsersUpdateStatus_InvalidStatus(t *testing.T) {
+	recorder := &fakeAuditRecorder{}
+	router, cfg, _ := setupRouter(&fakeRepo{}, recorder)
+	token, err := auth.GenerateToken(cfg, "33333333-3333-3333-3333-333333333333", RoleAdmin)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/users/11111111-1111-1111-1111-111111111111/status", strings.NewReader(`{"status":"locked"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 body=%s", w.Code, w.Body.String())
+	}
+	if len(recorder.events) != 1 || recorder.events[0].action != "admin.user_status.update" || recorder.events[0].result != audit.ResultFailed {
+		t.Fatalf("audit events = %+v, want one failed status event", recorder.events)
+	}
+}
+
+func TestAdminUsersUpdateStatus_SuccessAudited(t *testing.T) {
+	recorder := &fakeAuditRecorder{}
+	repo := &fakeRepo{oldStatus: StatusActive}
+	router, cfg, _ := setupRouter(repo, recorder)
+	token, err := auth.GenerateToken(cfg, "33333333-3333-3333-3333-333333333333", RoleAdmin)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/users/11111111-1111-1111-1111-111111111111/status", strings.NewReader(`{"status":"disabled"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 body=%s", w.Code, w.Body.String())
+	}
+	if repo.updateStatus != StatusDisabled {
+		t.Fatalf("update status = %q, want disabled", repo.updateStatus)
+	}
+	if len(recorder.events) != 1 {
+		t.Fatalf("audit events = %d, want 1", len(recorder.events))
+	}
+	event := recorder.events[0]
+	if event.action != "admin.user_status.update" || event.resourceType != "user" || event.result != audit.ResultSuccess {
+		t.Fatalf("audit event = %+v", event)
+	}
+	if event.metadata["old_status"] != StatusActive || event.metadata["new_status"] != StatusDisabled {
+		t.Fatalf("audit metadata = %+v", event.metadata)
+	}
+}
+
+func TestAdminUsersUpdateStatus_SelfDisableConflictAudited(t *testing.T) {
+	recorder := &fakeAuditRecorder{}
+	repo := &fakeRepo{oldStatus: StatusActive, updateErr: errs.ErrCannotDisableSelf}
+	router, cfg, _ := setupRouter(repo, recorder)
+	adminID := "33333333-3333-3333-3333-333333333333"
+	token, err := auth.GenerateToken(cfg, adminID, RoleAdmin)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/users/"+adminID+"/status", strings.NewReader(`{"status":"disabled"}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("status = %d, want 409 body=%s", w.Code, w.Body.String())
+	}
+	if len(recorder.events) != 1 || recorder.events[0].result != audit.ResultFailed || recorder.events[0].metadata["reason"] != "self_disable" {
+		t.Fatalf("audit events = %+v", recorder.events)
+	}
+}
+
 func TestServiceValidation(t *testing.T) {
 	service := NewService(&fakeRepo{})
 	if _, _, err := service.List(context.Background(), ListFilter{Role: "owner"}, 10, 0); !errors.Is(err, errs.ErrInvalidUserRole) {
@@ -221,6 +316,9 @@ func TestServiceValidation(t *testing.T) {
 	}
 	if _, _, err := service.List(context.Background(), ListFilter{Status: "deleted"}, 10, 0); !errors.Is(err, errs.ErrInvalidUserStatus) {
 		t.Fatalf("invalid status err = %v, want ErrInvalidUserStatus", err)
+	}
+	if _, _, err := service.UpdateStatus(context.Background(), "33333333-3333-3333-3333-333333333333", "11111111-1111-1111-1111-111111111111", "deleted"); !errors.Is(err, errs.ErrInvalidUserStatus) {
+		t.Fatalf("invalid update status err = %v, want ErrInvalidUserStatus", err)
 	}
 	if _, err := service.GetByID(context.Background(), "bad-id"); !errors.Is(err, errs.ErrInvalidID) {
 		t.Fatalf("invalid id err = %v, want ErrInvalidID", err)

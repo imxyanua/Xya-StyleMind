@@ -60,6 +60,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (map[string
 		FullName:     strings.TrimSpace(req.FullName),
 		PasswordHash: string(hash),
 		Role:         "user",
+		Status:       "active",
 	}
 	if err := s.repo.CreateUser(ctx, user); err != nil {
 		return nil, err
@@ -77,6 +78,7 @@ func (s *Service) Register(ctx context.Context, req RegisterRequest) (map[string
 			"email":     user.Email,
 			"full_name": user.FullName,
 			"role":      user.Role,
+			"status":    user.Status,
 		},
 	}, nil
 }
@@ -93,6 +95,9 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (map[string]inter
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		return nil, errs.ErrInvalidCredentials
 	}
+	if normalizedUserStatus(user.Status) == "disabled" {
+		return nil, errs.ErrUserDisabled
+	}
 
 	token, err := GenerateToken(s.tokenConfig, user.ID, user.Role)
 	if err != nil {
@@ -106,6 +111,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (map[string]inter
 			"email":     user.Email,
 			"full_name": user.FullName,
 			"role":      user.Role,
+			"status":    normalizedUserStatus(user.Status),
 		},
 	}, nil
 }
@@ -123,4 +129,11 @@ func (s *Service) Logout(ctx context.Context, jti string, expiresAt time.Time) e
 		return nil
 	}
 	return s.revocationStore.RevokeToken(ctx, jti, ttl)
+}
+
+func normalizedUserStatus(status string) string {
+	if strings.TrimSpace(status) == "" {
+		return "active"
+	}
+	return strings.TrimSpace(status)
 }

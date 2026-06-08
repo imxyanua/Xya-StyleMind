@@ -288,6 +288,7 @@ export type AdminUserListParams = NonNullable<
   operations["listAdminUsers"]["parameters"]["query"]
 >;
 export type UpdateAdminUserRoleInput = components["schemas"]["UpdateUserRoleRequest"];
+export type UpdateAdminUserStatusInput = components["schemas"]["UpdateUserStatusRequest"];
 
 export async function fetchAdminUsers(params: AdminUserListParams = {}) {
   const searchParams = new URLSearchParams();
@@ -309,6 +310,13 @@ export async function fetchAdminUser(id: string) {
 
 export async function updateAdminUserRole(id: string, input: UpdateAdminUserRoleInput) {
   return apiRequest<AdminUser>(`/admin/users/${id}/role`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateAdminUserStatus(id: string, input: UpdateAdminUserStatusInput) {
+  return apiRequest<AdminUser>(`/admin/users/${id}/status`, {
     method: "PATCH",
     body: JSON.stringify(input),
   });

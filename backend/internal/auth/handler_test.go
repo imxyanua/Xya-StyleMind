@@ -149,6 +149,43 @@ func TestHandlerLoginFailed_WritesAuditEventWithoutPassword(t *testing.T) {
 	assertAuditDoesNotContain(t, audit.String(), "password123", "should-not-log", "Authorization", "Bearer")
 }
 
+func TestHandlerLoginDisabled_ReturnsForbiddenAndAuditsSafely(t *testing.T) {
+	var audit bytes.Buffer
+	restore := logger.SetAuditOutput(&audit)
+	defer restore()
+
+	repo := newFakeUserRepository()
+	hash, err := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("GenerateFromPassword error = %v", err)
+	}
+	repo.usersByEmail["disabled@example.com"] = &User{
+		ID:           "disabled-1",
+		Email:        "disabled@example.com",
+		PasswordHash: string(hash),
+		Role:         "user",
+		Status:       "disabled",
+	}
+	router := newAuthAuditTestRouter(NewService(repo, testTokenConfig()))
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewBufferString(`{
+		"email":"disabled@example.com",
+		"password":"password123"
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assertErrorResponse(t, w, http.StatusForbidden, "account disabled")
+	assertAuditEvent(t, audit.String(), map[string]any{
+		"event":  "auth.login",
+		"result": "failed",
+		"email":  "disabled@example.com",
+		"reason": "account_disabled",
+	})
+	assertAuditDoesNotContain(t, audit.String(), "password123")
+}
+
 func TestHandlerRegisterSuccess_WritesAuditEvent(t *testing.T) {
 	var audit bytes.Buffer
 	restore := logger.SetAuditOutput(&audit)

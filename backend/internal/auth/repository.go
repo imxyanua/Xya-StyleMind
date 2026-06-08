@@ -30,13 +30,13 @@ func (r *Repository) CreateUser(ctx context.Context, user *User) error {
 
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	query := `
-		SELECT id, email, full_name, password_hash, role, created_at, updated_at
+		SELECT id, email, full_name, password_hash, role, COALESCE(status, 'active'), created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
 	user := &User{}
 	err := r.db.QueryRow(ctx, query, strings.ToLower(email)).
-		Scan(&user.ID, &user.Email, &user.FullName, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+		Scan(&user.ID, &user.Email, &user.FullName, &user.PasswordHash, &user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errs.ErrUserNotFound
@@ -48,13 +48,13 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*User, e
 
 func (r *Repository) GetUserByID(ctx context.Context, id string) (*User, error) {
 	query := `
-		SELECT id, email, full_name, password_hash, role, created_at, updated_at
+		SELECT id, email, full_name, password_hash, role, COALESCE(status, 'active'), created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`
 	user := &User{}
 	err := r.db.QueryRow(ctx, query, id).
-		Scan(&user.ID, &user.Email, &user.FullName, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+		Scan(&user.ID, &user.Email, &user.FullName, &user.PasswordHash, &user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errs.ErrUserNotFound
