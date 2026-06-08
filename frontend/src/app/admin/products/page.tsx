@@ -15,6 +15,7 @@ import {
   updateProduct,
   type ProductInput,
 } from "@/lib/api";
+import { PRODUCT_IMAGE_BLUR } from "@/lib/images";
 import type { Category } from "@/types/category";
 import type { Product } from "@/types/product";
 
@@ -389,6 +390,8 @@ export default function AdminProductsPage() {
                           fill
                           className="object-cover"
                           sizes="64px"
+                          placeholder="blur"
+                          blurDataURL={PRODUCT_IMAGE_BLUR}
                         />
                       </div>
                       <div>

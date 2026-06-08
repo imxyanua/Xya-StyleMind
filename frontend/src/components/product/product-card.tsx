@@ -5,6 +5,7 @@ import { Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { WishlistButton } from "@/components/wishlist/wishlist-button";
+import { PRODUCT_IMAGE_BLUR } from "@/lib/images";
 import type { Product } from "@/types/product";
 
 type ProductCardProps = {
@@ -40,7 +41,9 @@ export function ProductCard({
           alt={product.name}
           fill
           className="object-cover transition duration-700 group-hover:scale-105"
-          sizes="(max-width: 1024px) 100vw, 33vw"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          placeholder="blur"
+          blurDataURL={PRODUCT_IMAGE_BLUR}
         />
         <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-3 bg-gradient-to-b from-black/45 to-transparent p-3">
           <Badge variant={inStock ? "secondary" : "destructive"} className="bg-card/95">

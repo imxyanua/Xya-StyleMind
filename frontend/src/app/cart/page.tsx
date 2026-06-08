@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { checkoutOrder, fetchCart, removeCartItem, updateCartItem } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { PRODUCT_IMAGE_BLUR } from "@/lib/images";
 import { ApiError } from "@/types/api";
 import type { Cart } from "@/types/cart";
 
@@ -191,6 +192,8 @@ export default function CartPage() {
                         fill
                         className="object-cover"
                         sizes="120px"
+                        placeholder="blur"
+                        blurDataURL={PRODUCT_IMAGE_BLUR}
                       />
                     </div>
                     <div className="space-y-1">

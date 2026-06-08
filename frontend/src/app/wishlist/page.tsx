@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { addToCart, fetchWishlist, removeWishlistProduct } from "@/lib/api";
 import { getToken } from "@/lib/auth";
+import { PRODUCT_IMAGE_BLUR } from "@/lib/images";
 import { ApiError } from "@/types/api";
 import type { WishlistItem } from "@/types/wishlist";
 
@@ -161,7 +162,9 @@ export default function WishlistPage() {
                       alt={product.name ?? "Wishlist product"}
                       fill
                       className="object-cover"
-                      sizes="(max-width: 1024px) 100vw, 33vw"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      placeholder="blur"
+                      blurDataURL={PRODUCT_IMAGE_BLUR}
                     />
                   ) : null}
                   <div className="absolute left-3 top-3">

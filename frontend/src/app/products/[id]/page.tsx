@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { WishlistButton } from "@/components/wishlist/wishlist-button";
+import { PRODUCT_IMAGE_BLUR } from "@/lib/images";
 import {
   addToCart,
   addWishlistProduct,
@@ -376,6 +377,9 @@ export default function ProductDetailPage() {
             className="object-cover"
             sizes="100vw"
             priority
+            loading="eager"
+            placeholder="blur"
+            blurDataURL={PRODUCT_IMAGE_BLUR}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/15" />
           <div className="absolute right-4 top-4">
