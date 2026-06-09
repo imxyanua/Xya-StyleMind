@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { MapPin, ShieldCheck, Truck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -123,7 +124,7 @@ export default function CartPage() {
     setError(null);
     try {
       await checkoutOrder();
-      router.push("/orders");
+      router.push("/orders?checkout=success");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         router.replace("/login?redirect=/cart");
@@ -179,7 +180,7 @@ export default function CartPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="space-y-4">
             {cart?.items.map((item) => (
               <Card key={item.id} className="surface-card overflow-hidden rounded-[1.5rem]">
@@ -241,11 +242,43 @@ export default function CartPage() {
 
           <Card className="surface-card h-fit rounded-[1.5rem] lg:sticky lg:top-28">
             <CardHeader>
-              <CardTitle className="text-2xl">Order summary</CardTitle>
+              <CardTitle className="text-2xl">Checkout summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between rounded-2xl bg-muted/60 p-4">
-                <span className="text-sm text-muted-foreground">Total</span>
+              <div className="space-y-3 rounded-2xl border border-border bg-muted/45 p-4 text-sm">
+                <div className="flex items-center gap-2 font-medium">
+                  <MapPin className="size-4" />
+                  Delivery contact
+                </div>
+                <p className="leading-6 text-muted-foreground">
+                  MVP checkout uses your account email. Address collection and carrier selection are
+                  ready for the next backend phase.
+                </p>
+              </div>
+              <div className="grid gap-2 rounded-2xl border border-border bg-card/70 p-4 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Items</span>
+                  <span>{cart?.items.length ?? 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Shipping</span>
+                  <span>Calculated later</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-border pt-3">
+                  <span className="font-medium">Total</span>
+                  <span className="font-heading text-2xl font-semibold">{formatVND(cart?.total ?? 0)}</span>
+                </div>
+              </div>
+              <div className="grid gap-2 text-xs text-muted-foreground">
+                <p className="inline-flex items-center gap-2">
+                  <ShieldCheck className="size-4" /> Stock is validated again during checkout.
+                </p>
+                <p className="inline-flex items-center gap-2">
+                  <Truck className="size-4" /> Order status appears in your order history after success.
+                </p>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl bg-primary p-4 text-primary-foreground">
+                <span className="text-sm opacity-80">Payable now</span>
                 <span className="font-heading text-2xl font-semibold">
                   {formatVND(cart?.total ?? 0)}
                 </span>

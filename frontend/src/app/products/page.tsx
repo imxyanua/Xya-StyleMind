@@ -506,7 +506,18 @@ function ProductsBrowser() {
           {loading ? (
             <div className="grid min-w-0 gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="h-[470px] animate-pulse rounded-[1.75rem] bg-muted/80" />
+                <div key={index} className="surface-card overflow-hidden rounded-[1.75rem]">
+                  <div className="h-72 animate-pulse bg-muted" />
+                  <div className="space-y-3 p-5">
+                    <div className="h-6 w-3/4 animate-pulse rounded-full bg-muted" />
+                    <div className="h-4 w-1/2 animate-pulse rounded-full bg-muted" />
+                    <div className="h-8 w-32 animate-pulse rounded-full bg-muted" />
+                    <div className="flex gap-2">
+                      <div className="h-6 w-20 animate-pulse rounded-full bg-muted" />
+                      <div className="h-6 w-16 animate-pulse rounded-full bg-muted" />
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           ) : null}
@@ -516,16 +527,25 @@ function ProductsBrowser() {
               <CardContent className="state-panel">
                 <p className="text-lg font-semibold">No products matched those filters.</p>
                 <p className="max-w-md text-sm text-muted-foreground">
-                  Try lowering the rating threshold, expanding the price range, or clearing filters.
+                  Your current search is a little too specific. Try a broader color, lower rating,
+                  wider price range, or jump into a popular style collection.
                 </p>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    router.replace(pathname, { scroll: false });
-                  }}
-                >
-                  Reset search
-                </Button>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      router.replace(pathname, { scroll: false });
+                    }}
+                  >
+                    Reset search
+                  </Button>
+                  <Button asChild>
+                    <Link href="/products?style=streetwear">Shop streetwear</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/products?sort=rating_desc">Top rated</Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ) : null}

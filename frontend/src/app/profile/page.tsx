@@ -211,7 +211,7 @@ export default function ProfilePage() {
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Card className="surface-card rounded-[1.75rem]">
+        <Card id="orders" className="surface-card rounded-[1.75rem]">
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="eyebrow">Order pulse</p>
@@ -259,11 +259,25 @@ export default function ProfilePage() {
             <CardTitle className="text-3xl">Account</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
+            <div className="rounded-3xl border border-border bg-muted/50 p-4">
+              <p className="text-sm font-medium">Account status</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Your account is currently{" "}
+                <span className="font-semibold text-foreground">{profile.status ?? "active"}</span>.
+                Protected shopping actions are available while the account remains active.
+              </p>
+            </div>
+            <Button asChild variant="outline">
+              <Link href="/orders">Open orders</Link>
+            </Button>
             <Button asChild variant="outline">
               <Link href="/wishlist">Open wishlist</Link>
             </Button>
             <Button asChild variant="outline">
               <Link href="/cart">Open cart</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="#reviews">Review activity</Link>
             </Button>
             {profile.role === "admin" ? (
               <Button asChild variant="outline">
@@ -276,6 +290,22 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card id="reviews" className="surface-card rounded-[1.75rem]">
+        <CardHeader>
+          <p className="eyebrow">Review center</p>
+          <CardTitle className="text-3xl">Your product voice</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-2xl text-sm leading-7 text-muted-foreground">
+            You have {stats.reviewCount} review{stats.reviewCount === 1 ? "" : "s"} detected from
+            recently purchased products. Open your orders to revisit products and update verified reviews.
+          </p>
+          <Button asChild>
+            <Link href="/orders">Go to Orders</Link>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

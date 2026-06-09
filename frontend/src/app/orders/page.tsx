@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CheckCircle2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,11 @@ export default function OrdersPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [checkoutSuccess] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("checkout") === "success"
+  );
 
   useEffect(() => {
     if (!getToken()) {
@@ -101,6 +107,32 @@ export default function OrdersPage() {
         <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </p>
+      ) : null}
+
+      {checkoutSuccess ? (
+        <Card className="surface-card rounded-[1.75rem] border-primary/30 bg-secondary/45">
+          <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground">
+                <CheckCircle2 className="size-5" />
+              </span>
+              <div>
+                <p className="text-lg font-semibold">Order placed successfully.</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Your cart was converted into an order. You can track status here or keep shopping.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="outline">
+                <Link href="/products">Continue shopping</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/orders">Orders</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : null}
 
       {!error && orders.length === 0 ? (
