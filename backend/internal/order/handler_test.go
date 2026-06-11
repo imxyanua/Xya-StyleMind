@@ -249,6 +249,16 @@ func TestProtectedOrderRoutes_RequireToken(t *testing.T) {
 	assertOrderErrorResponse(t, w, http.StatusUnauthorized, "unauthorized")
 }
 
+func TestProtectedOrderDetail_RequireToken(t *testing.T) {
+	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/orders/"+uuid.NewString(), nil)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusUnauthorized, "unauthorized")
+}
+
 func TestProtectedOrderRoutes_MissingBearerPrefix(t *testing.T) {
 	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
 

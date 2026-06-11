@@ -165,7 +165,7 @@ test("core ecommerce flows work against the real backend", async ({ page, reques
   await expect(page.getByText(selectedProduct.name)).toBeVisible();
   await expect(page.getByText("E2E Fashion Buyer")).toBeVisible();
   await expect(page.getByText(/88 E2E Style Street/)).toBeVisible();
-  await expect(page.getByText("Express delivery")).toBeVisible();
+  await expect(page.getByText("Express delivery").first()).toBeVisible();
   await expect(page.getByText("Payment: Demo payment")).toBeVisible();
 
   const token = await authToken(page);
@@ -174,7 +174,25 @@ test("core ecommerce flows work against the real backend", async ({ page, reques
     order.items.some((item) => item.product_id === selectedProduct.id)
   );
   expect(createdOrder, "checkout should create an order containing selected product").toBeTruthy();
-  await markOrderPaid((createdOrder as Order).id);
+  const createdOrderId = (createdOrder as Order).id;
+
+  await page.getByRole("link", { name: "View details" }).first().click();
+  await expect(page).toHaveURL(new RegExp(`/orders/${createdOrderId}`));
+  await expect(page.getByText("Order progress")).toBeVisible();
+  await expect(page.getByText("Shipping contact")).toBeVisible();
+  await expect(page.getByText("Order summary")).toBeVisible();
+  await expect(page.getByText("Payment", { exact: true })).toBeVisible();
+  await expect(page.getByText(selectedProduct.name)).toBeVisible();
+  await expect(page.getByText("E2E Fashion Buyer")).toBeVisible();
+  await expect(page.getByText(/88 E2E Style Street/)).toBeVisible();
+  await expect(page.getByText("Express delivery").first()).toBeVisible();
+  await expect(page.getByText("Demo payment").first()).toBeVisible();
+
+  await page.goto(`/orders/${createdOrderId}`);
+  await expect(page.getByText("Order progress")).toBeVisible();
+  await expect(page.getByText(selectedProduct.name)).toBeVisible();
+
+  await markOrderPaid(createdOrderId);
 
   await page.goto(`/products/${selectedProduct.id}`);
   await expect(page.getByRole("button", { name: "Submit review" })).toBeVisible();
@@ -202,6 +220,8 @@ test("core ecommerce flows work against the real backend", async ({ page, reques
   await request.post(`${API_BASE_URL}/auth/logout`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+  await page.goto(`/orders/${createdOrderId}`);
+  await expect(page).toHaveURL(/\/login\?redirect=\/orders\//);
   await page.goto("/cart");
   await expect(page).toHaveURL(/\/login\?redirect=\/cart/);
 });

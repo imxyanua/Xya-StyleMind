@@ -135,6 +135,11 @@ export default function OrdersPage() {
               <Button asChild variant="outline">
                 <Link href="/products">Continue shopping</Link>
               </Button>
+              {orders[0]?.id ? (
+                <Button asChild variant="outline">
+                  <Link href={`/orders/${orders[0].id}`}>View latest order</Link>
+                </Button>
+              ) : null}
               <Button asChild>
                 <Link href="/orders">Orders</Link>
               </Button>
@@ -208,6 +213,14 @@ export default function OrdersPage() {
                     <span className="font-medium">{formatVND(item.unit_price)}</span>
                   </div>
                 ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild>
+                  <Link href={`/orders/${order.id}`}>View details</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href="/products">Continue shopping</Link>
+                </Button>
               </div>
             </CardContent>
           </Card>

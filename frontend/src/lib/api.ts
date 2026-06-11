@@ -244,6 +244,10 @@ export async function fetchMyOrders(params: OrderListParams = {}) {
   return apiRequest<Order[]>(`/orders${query ? `?${query}` : ""}`, { method: "GET" });
 }
 
+export async function fetchMyOrder(id: string) {
+  return apiRequest<Order>(`/orders/${id}`, { method: "GET" });
+}
+
 export type AdminOrderListParams = NonNullable<
   operations["listAdminOrders"]["parameters"]["query"]
 >;
