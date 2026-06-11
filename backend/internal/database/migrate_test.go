@@ -75,6 +75,26 @@ func TestInitialSchemaContainsCoreConstraints(t *testing.T) {
 	}
 }
 
+func TestOrderCheckoutDetailsMigrationIsIdempotent(t *testing.T) {
+	sql := readMigrationForTest(t, "0008_add_order_checkout_details.sql")
+
+	required := []string{
+		"ADD COLUMN IF NOT EXISTS recipient_name",
+		"ADD COLUMN IF NOT EXISTS phone",
+		"ADD COLUMN IF NOT EXISTS address_line",
+		"orders_shipping_method_check",
+		"orders_payment_method_check",
+		"CREATE INDEX IF NOT EXISTS idx_orders_shipping_method",
+		"CREATE INDEX IF NOT EXISTS idx_orders_payment_method",
+	}
+
+	for _, text := range required {
+		if !strings.Contains(sql, text) {
+			t.Fatalf("checkout details migration missing %q", text)
+		}
+	}
+}
+
 func migrationFilesForTest(t *testing.T) []string {
 	t.Helper()
 

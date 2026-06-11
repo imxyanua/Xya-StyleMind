@@ -11,12 +11,20 @@ const (
 )
 
 type Order struct {
-	ID          string    `json:"id"`
-	UserID      string    `json:"user_id"`
-	Status      string    `json:"status"`
-	TotalAmount float64   `json:"total_amount"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID             string    `json:"id"`
+	UserID         string    `json:"user_id"`
+	Status         string    `json:"status"`
+	TotalAmount    float64   `json:"total_amount"`
+	RecipientName  string    `json:"recipient_name,omitempty"`
+	Phone          string    `json:"phone,omitempty"`
+	AddressLine    string    `json:"address_line,omitempty"`
+	City           string    `json:"city,omitempty"`
+	District       string    `json:"district,omitempty"`
+	Note           string    `json:"note,omitempty"`
+	ShippingMethod string    `json:"shipping_method,omitempty"`
+	PaymentMethod  string    `json:"payment_method,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type ProductInfo struct {
@@ -44,14 +52,33 @@ type OrderUser struct {
 }
 
 type OrderResponse struct {
-	ID          string      `json:"id"`
-	UserID      string      `json:"user_id"`
-	User        *OrderUser  `json:"user,omitempty"`
-	Status      string      `json:"status"`
-	TotalAmount float64     `json:"total_amount"`
-	Items       []OrderItem `json:"items"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
+	ID             string      `json:"id"`
+	UserID         string      `json:"user_id"`
+	User           *OrderUser  `json:"user,omitempty"`
+	Status         string      `json:"status"`
+	TotalAmount    float64     `json:"total_amount"`
+	RecipientName  string      `json:"recipient_name,omitempty"`
+	Phone          string      `json:"phone,omitempty"`
+	AddressLine    string      `json:"address_line,omitempty"`
+	City           string      `json:"city,omitempty"`
+	District       string      `json:"district,omitempty"`
+	Note           string      `json:"note,omitempty"`
+	ShippingMethod string      `json:"shipping_method,omitempty"`
+	PaymentMethod  string      `json:"payment_method,omitempty"`
+	Items          []OrderItem `json:"items"`
+	CreatedAt      time.Time   `json:"created_at"`
+	UpdatedAt      time.Time   `json:"updated_at"`
+}
+
+type CheckoutDetails struct {
+	RecipientName  string
+	Phone          string
+	AddressLine    string
+	City           string
+	District       string
+	Note           string
+	ShippingMethod string
+	PaymentMethod  string
 }
 
 type CheckoutItem struct {

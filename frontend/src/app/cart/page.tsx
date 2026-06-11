@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -8,7 +8,7 @@ import { MapPin, ShieldCheck, Truck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { checkoutOrder, fetchCart, removeCartItem, updateCartItem } from "@/lib/api";
+import { checkoutOrder, fetchCart, removeCartItem, updateCartItem, type CheckoutInput } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { PRODUCT_IMAGE_BLUR } from "@/lib/images";
 import { ApiError } from "@/types/api";
@@ -29,6 +29,16 @@ export default function CartPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [itemBusyId, setItemBusyId] = useState<string | null>(null);
   const [quantityInputs, setQuantityInputs] = useState<Record<string, number>>({});
+  const [checkoutForm, setCheckoutForm] = useState<CheckoutInput>({
+    recipient_name: "",
+    phone: "",
+    address_line: "",
+    city: "",
+    district: "",
+    note: "",
+    shipping_method: "standard",
+    payment_method: "cod",
+  });
 
   useEffect(() => {
     if (!getToken()) {
@@ -119,11 +129,16 @@ export default function CartPage() {
     }
   }
 
-  async function onCheckout() {
+  function updateCheckoutField<K extends keyof CheckoutInput>(key: K, value: CheckoutInput[K]) {
+    setCheckoutForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function onCheckout(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setCheckoutLoading(true);
     setError(null);
     try {
-      await checkoutOrder();
+      await checkoutOrder(checkoutForm);
       router.push("/orders?checkout=success");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -245,14 +260,152 @@ export default function CartPage() {
               <CardTitle className="text-2xl">Checkout summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <form id="checkout-form" className="space-y-4" onSubmit={onCheckout}>
+                <div className="space-y-3 rounded-2xl border border-border bg-muted/45 p-4 text-sm">
+                  <div className="flex items-center gap-2 font-medium">
+                    <MapPin className="size-4" />
+                    Delivery contact
+                  </div>
+                  <div className="grid gap-3">
+                    <div className="space-y-1">
+                      <label htmlFor="recipient_name" className="text-xs font-medium text-muted-foreground">
+                        Recipient name
+                      </label>
+                      <input
+                        id="recipient_name"
+                        required
+                        minLength={2}
+                        maxLength={120}
+                        value={checkoutForm.recipient_name}
+                        onChange={(event) => updateCheckoutField("recipient_name", event.target.value)}
+                        className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                        placeholder="Nguyen Van A"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="phone" className="text-xs font-medium text-muted-foreground">
+                        Phone
+                      </label>
+                      <input
+                        id="phone"
+                        required
+                        minLength={8}
+                        maxLength={32}
+                        value={checkoutForm.phone}
+                        onChange={(event) => updateCheckoutField("phone", event.target.value)}
+                        className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                        placeholder="0901234567"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="address_line" className="text-xs font-medium text-muted-foreground">
+                        Address
+                      </label>
+                      <input
+                        id="address_line"
+                        required
+                        minLength={5}
+                        maxLength={255}
+                        value={checkoutForm.address_line}
+                        onChange={(event) => updateCheckoutField("address_line", event.target.value)}
+                        className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                        placeholder="123 Nguyen Trai"
+                      />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                      <div className="space-y-1">
+                        <label htmlFor="city" className="text-xs font-medium text-muted-foreground">
+                          City
+                        </label>
+                        <input
+                          id="city"
+                          required
+                          minLength={2}
+                          maxLength={120}
+                          value={checkoutForm.city}
+                          onChange={(event) => updateCheckoutField("city", event.target.value)}
+                          className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                          placeholder="Ho Chi Minh City"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label htmlFor="district" className="text-xs font-medium text-muted-foreground">
+                          District
+                        </label>
+                        <input
+                          id="district"
+                          required
+                          minLength={2}
+                          maxLength={120}
+                          value={checkoutForm.district}
+                          onChange={(event) => updateCheckoutField("district", event.target.value)}
+                          className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                          placeholder="District 1"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="note" className="text-xs font-medium text-muted-foreground">
+                        Delivery note
+                      </label>
+                      <textarea
+                        id="note"
+                        maxLength={1000}
+                        value={checkoutForm.note ?? ""}
+                        onChange={(event) => updateCheckoutField("note", event.target.value)}
+                        className="min-h-20 w-full rounded-xl border border-input bg-card px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                        placeholder="Call before delivery, preferred time, building note..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 rounded-2xl border border-border bg-card/70 p-4 text-sm">
+                  <div className="space-y-1">
+                    <label htmlFor="shipping_method" className="text-xs font-medium text-muted-foreground">
+                      Shipping method
+                    </label>
+                    <select
+                      id="shipping_method"
+                      value={checkoutForm.shipping_method}
+                      onChange={(event) =>
+                        updateCheckoutField("shipping_method", event.target.value as CheckoutInput["shipping_method"])
+                      }
+                      className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                    >
+                      <option value="standard">Standard delivery</option>
+                      <option value="express">Express delivery</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="payment_method" className="text-xs font-medium text-muted-foreground">
+                      Payment method
+                    </label>
+                    <select
+                      id="payment_method"
+                      value={checkoutForm.payment_method}
+                      onChange={(event) =>
+                        updateCheckoutField("payment_method", event.target.value as CheckoutInput["payment_method"])
+                      }
+                      className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                    >
+                      <option value="cod">COD - Cash on delivery</option>
+                      <option value="demo_payment">Demo payment placeholder</option>
+                    </select>
+                  </div>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    No real card, bank, or wallet credentials are collected in this MVP checkout.
+                  </p>
+                </div>
+              </form>
+
               <div className="space-y-3 rounded-2xl border border-border bg-muted/45 p-4 text-sm">
                 <div className="flex items-center gap-2 font-medium">
                   <MapPin className="size-4" />
-                  Delivery contact
+                  Order destination
                 </div>
                 <p className="leading-6 text-muted-foreground">
-                  MVP checkout uses your account email. Address collection and carrier selection are
-                  ready for the next backend phase.
+                  Saved on the order so customer and admin order screens can show fulfillment details.
                 </p>
               </div>
               <div className="grid gap-2 rounded-2xl border border-border bg-card/70 p-4 text-sm">
@@ -283,7 +436,7 @@ export default function CartPage() {
                   {formatVND(cart?.total ?? 0)}
                 </span>
               </div>
-              <Button className="w-full" onClick={onCheckout} disabled={checkoutLoading || isEmpty}>
+              <Button form="checkout-form" type="submit" className="w-full" disabled={checkoutLoading || isEmpty}>
                 {checkoutLoading ? "Processing..." : "Checkout"}
               </Button>
             </CardContent>

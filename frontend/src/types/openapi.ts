@@ -948,11 +948,33 @@ export interface components {
             /** @enum {string} */
             status?: "pending" | "paid" | "shipping" | "completed" | "cancelled";
             total_amount?: number;
+            recipient_name?: string;
+            phone?: string;
+            address_line?: string;
+            city?: string;
+            district?: string;
+            note?: string;
+            /** @enum {string} */
+            shipping_method?: "standard" | "express";
+            /** @enum {string} */
+            payment_method?: "cod" | "demo_payment";
             items?: components["schemas"]["OrderItem"][];
             /** Format: date-time */
             created_at?: string;
             /** Format: date-time */
             updated_at?: string;
+        };
+        CheckoutRequest: {
+            recipient_name: string;
+            phone: string;
+            address_line: string;
+            city: string;
+            district: string;
+            note?: string;
+            /** @enum {string} */
+            shipping_method: "standard" | "express";
+            /** @enum {string} */
+            payment_method: "cod" | "demo_payment";
         };
         UpdateOrderStatusRequest: {
             /** @enum {string} */
@@ -1755,7 +1777,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutRequest"];
+            };
+        };
         responses: {
             /** @description Order created */
             201: {

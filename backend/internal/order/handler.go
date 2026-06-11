@@ -41,10 +41,31 @@ func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, authMiddleware
 }
 
 func (h *Handler) Checkout(c *gin.Context) {
+	var req CheckoutRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid payload")
+		return
+	}
+	if err := validator.Validate.Struct(req); err != nil {
+		response.Error(c, http.StatusBadRequest, "validation failed")
+		return
+	}
+
 	userID := c.GetString("user_id")
-	order, err := h.service.Checkout(c.Request.Context(), userID)
+	order, err := h.service.Checkout(c.Request.Context(), userID, CheckoutDetails{
+		RecipientName:  req.RecipientName,
+		Phone:          req.Phone,
+		AddressLine:    req.AddressLine,
+		City:           req.City,
+		District:       req.District,
+		Note:           req.Note,
+		ShippingMethod: req.ShippingMethod,
+		PaymentMethod:  req.PaymentMethod,
+	})
 	if err != nil {
 		switch {
+		case errors.Is(err, errs.ErrValidationFailed):
+			response.Error(c, http.StatusBadRequest, "validation failed")
 		case errors.Is(err, errs.ErrCartEmpty):
 			response.Error(c, http.StatusBadRequest, "cart is empty")
 		case errors.Is(err, errs.ErrInsufficientStock):

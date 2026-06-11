@@ -59,6 +59,14 @@ function shortID(value?: string) {
   return `${value.slice(0, 8)}...${value.slice(-6)}`;
 }
 
+function shippingLabel(method?: string) {
+  return method === "express" ? "Express delivery" : method === "standard" ? "Standard delivery" : "Not provided";
+}
+
+function paymentLabel(method?: string) {
+  return method === "demo_payment" ? "Demo payment" : method === "cod" ? "COD" : "Not provided";
+}
+
 function buildParams(
   filters: FilterState,
   page: number
@@ -531,6 +539,28 @@ export default function AdminOrdersPage() {
                     <p className="mt-2 font-heading text-2xl font-semibold">
                       {formatVND(selectedOrder.total_amount)}
                     </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-card/70 p-4">
+                  <p className="text-sm font-medium">Shipping & payment</p>
+                  <div className="mt-3 grid gap-3 text-sm md:grid-cols-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Recipient</p>
+                      <p className="mt-2 font-medium">{selectedOrder.recipient_name || "Not provided"}</p>
+                      <p className="mt-1 text-muted-foreground">
+                        {[selectedOrder.address_line, selectedOrder.district, selectedOrder.city]
+                          .filter(Boolean)
+                          .join(", ") || "Address not provided"}
+                      </p>
+                      {selectedOrder.phone ? <p className="mt-1 text-muted-foreground">{selectedOrder.phone}</p> : null}
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Method</p>
+                      <p className="mt-2 font-medium">{shippingLabel(selectedOrder.shipping_method)}</p>
+                      <p className="mt-1 text-muted-foreground">Payment: {paymentLabel(selectedOrder.payment_method)}</p>
+                      {selectedOrder.note ? <p className="mt-1 text-muted-foreground">Note: {selectedOrder.note}</p> : null}
+                    </div>
                   </div>
                 </div>
 

@@ -152,9 +152,21 @@ test("core ecommerce flows work against the real backend", async ({ page, reques
   await expect(page.getByText(selectedProduct.name)).toBeVisible();
   await page.getByRole("spinbutton").first().fill("2");
   await page.getByRole("button", { name: "Update" }).first().click();
+  await page.getByLabel("Recipient name").fill("E2E Fashion Buyer");
+  await page.getByLabel("Phone").fill("0901234567");
+  await page.getByLabel("Address").fill("88 E2E Style Street");
+  await page.getByLabel("City").fill("Ho Chi Minh City");
+  await page.getByLabel("District").fill("District 1");
+  await page.getByLabel("Delivery note").fill("E2E delivery note");
+  await page.getByLabel("Shipping method").selectOption("express");
+  await page.getByLabel("Payment method").selectOption("demo_payment");
   await page.getByRole("button", { name: "Checkout" }).click();
   await expect(page).toHaveURL(/\/orders/);
   await expect(page.getByText(selectedProduct.name)).toBeVisible();
+  await expect(page.getByText("E2E Fashion Buyer")).toBeVisible();
+  await expect(page.getByText(/88 E2E Style Street/)).toBeVisible();
+  await expect(page.getByText("Express delivery")).toBeVisible();
+  await expect(page.getByText("Payment: Demo payment")).toBeVisible();
 
   const token = await authToken(page);
   const ordersResponse = await apiGet<Order[]>(request, "/orders?limit=20", token);

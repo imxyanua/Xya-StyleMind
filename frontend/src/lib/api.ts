@@ -218,8 +218,13 @@ export async function removeCartItem(itemId: string) {
   return apiRequest<Cart>(`/cart/items/${itemId}`, { method: "DELETE" });
 }
 
-export async function checkoutOrder() {
-  return apiRequest<Order>("/orders", { method: "POST" });
+export type CheckoutInput = components["schemas"]["CheckoutRequest"];
+
+export async function checkoutOrder(input: CheckoutInput) {
+  return apiRequest<Order>("/orders", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 type OrderListParams = {

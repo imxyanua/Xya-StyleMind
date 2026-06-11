@@ -23,6 +23,7 @@ type fakeOrderRepository struct {
 	currentStatus          string
 	lastUserID             string
 	lastCartID             string
+	lastCheckoutDetails    CheckoutDetails
 	lastOrderID            string
 	lastStatus             string
 	lastAllowedStatuses    []string
@@ -48,9 +49,10 @@ func (r *fakeOrderRepository) GetOrCreateCart(ctx context.Context, userID string
 	return r.cartID, nil
 }
 
-func (r *fakeOrderRepository) CreateOrderFromCart(_ context.Context, userID, cartID string) (string, error) {
+func (r *fakeOrderRepository) CreateOrderFromCart(_ context.Context, userID, cartID string, details CheckoutDetails) (string, error) {
 	r.lastUserID = userID
 	r.lastCartID = cartID
+	r.lastCheckoutDetails = details
 	if r.createOrderErr != nil {
 		return "", r.createOrderErr
 	}
@@ -58,6 +60,19 @@ func (r *fakeOrderRepository) CreateOrderFromCart(_ context.Context, userID, car
 		r.orderID = uuid.NewString()
 	}
 	return r.orderID, nil
+}
+
+func validCheckoutDetails() CheckoutDetails {
+	return CheckoutDetails{
+		RecipientName:  "Nguyen Van A",
+		Phone:          "0901234567",
+		AddressLine:    "123 Nguyen Trai",
+		City:           "Ho Chi Minh City",
+		District:       "District 1",
+		Note:           "Call before delivery",
+		ShippingMethod: "standard",
+		PaymentMethod:  "cod",
+	}
 }
 
 func (r *fakeOrderRepository) GetOrderByIDForUser(_ context.Context, orderID, userID string) (*OrderResponse, error) {
@@ -123,7 +138,7 @@ func TestServiceCheckout_Success(t *testing.T) {
 	repo := &fakeOrderRepository{cartID: "cart-1", orderID: orderID}
 	service := NewService(repo)
 
-	order, err := service.Checkout(context.Background(), "user-1")
+	order, err := service.Checkout(context.Background(), "user-1", validCheckoutDetails())
 	if err != nil {
 		t.Fatalf("Checkout error = %v", err)
 	}
@@ -132,6 +147,9 @@ func TestServiceCheckout_Success(t *testing.T) {
 	}
 	if repo.lastCartID != "cart-1" {
 		t.Fatalf("lastCartID = %q, want cart-1", repo.lastCartID)
+	}
+	if repo.lastCheckoutDetails.PaymentMethod != "cod" || repo.lastCheckoutDetails.ShippingMethod != "standard" {
+		t.Fatalf("checkout details = %+v, want cod/standard", repo.lastCheckoutDetails)
 	}
 	if !repo.getOrderForUserCalled {
 		t.Fatal("GetOrderByIDForUser was not called")
@@ -142,9 +160,34 @@ func TestServiceCheckout_EmptyCart(t *testing.T) {
 	repo := &fakeOrderRepository{createOrderErr: errs.ErrCartEmpty}
 	service := NewService(repo)
 
-	_, err := service.Checkout(context.Background(), "user-1")
+	_, err := service.Checkout(context.Background(), "user-1", validCheckoutDetails())
 	if !errors.Is(err, errs.ErrCartEmpty) {
 		t.Fatalf("err = %v, want ErrCartEmpty", err)
+	}
+}
+
+func TestServiceCheckout_RejectsMissingShippingDetails(t *testing.T) {
+	service := NewService(&fakeOrderRepository{})
+
+	_, err := service.Checkout(context.Background(), "user-1", CheckoutDetails{PaymentMethod: "cod"})
+	if !errors.Is(err, errs.ErrValidationFailed) {
+		t.Fatalf("err = %v, want ErrValidationFailed", err)
+	}
+}
+
+func TestServiceCheckout_RejectsInvalidPaymentOrShippingMethod(t *testing.T) {
+	service := NewService(&fakeOrderRepository{})
+	details := validCheckoutDetails()
+	details.ShippingMethod = "drone"
+
+	if _, err := service.Checkout(context.Background(), "user-1", details); !errors.Is(err, errs.ErrValidationFailed) {
+		t.Fatalf("invalid shipping err = %v, want ErrValidationFailed", err)
+	}
+
+	details = validCheckoutDetails()
+	details.PaymentMethod = "card_pan"
+	if _, err := service.Checkout(context.Background(), "user-1", details); !errors.Is(err, errs.ErrValidationFailed) {
+		t.Fatalf("invalid payment err = %v, want ErrValidationFailed", err)
 	}
 }
 

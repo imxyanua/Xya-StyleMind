@@ -87,11 +87,46 @@ func (r *fakeOrderAuditRecorder) RecordAdmin(_ *gin.Context, action, resourceTyp
 	r.events = append(r.events, recordedOrderAudit{action: action, resourceType: resourceType, resourceID: resourceID, result: result, metadata: metadata})
 }
 
+func validCheckoutBody() *bytes.Buffer {
+	return bytes.NewBufferString(`{
+		"recipient_name":"Nguyen Van A",
+		"phone":"0901234567",
+		"address_line":"123 Nguyen Trai",
+		"city":"Ho Chi Minh City",
+		"district":"District 1",
+		"note":"Call before delivery",
+		"shipping_method":"standard",
+		"payment_method":"cod"
+	}`)
+}
+
+func TestHandlerCheckout_MissingPayload(t *testing.T) {
+	router := newOrderTestRouter(&fakeOrderRepository{})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders", nil)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusBadRequest, "invalid payload")
+}
+
+func TestHandlerCheckout_MissingAddressValidation(t *testing.T) {
+	router := newOrderTestRouter(&fakeOrderRepository{})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders", bytes.NewBufferString(`{"recipient_name":"A","payment_method":"cod"}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusBadRequest, "validation failed")
+}
+
 func TestHandlerCheckout_EmptyCart(t *testing.T) {
 	router := newOrderTestRouter(&fakeOrderRepository{createOrderErr: errs.ErrCartEmpty})
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders", validCheckoutBody())
+	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
 	assertOrderErrorResponse(t, w, http.StatusBadRequest, "cart is empty")
@@ -112,7 +147,8 @@ func TestHandlerCheckout_PropagatesRequestDeadlineToRepository(t *testing.T) {
 	RegisterRoutes(api, admin, authMiddleware, NewService(repo))
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders", validCheckoutBody())
+	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusCreated {

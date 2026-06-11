@@ -431,6 +431,23 @@ paths:
       operationId: checkout
       security:
         - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutRequest'
+            examples:
+              default:
+                value:
+                  recipient_name: Nguyen Van A
+                  phone: '0901234567'
+                  address_line: 123 Nguyen Trai
+                  city: Ho Chi Minh City
+                  district: District 1
+                  note: Call before delivery
+                  shipping_method: standard
+                  payment_method: cod
       responses:
         '201':
           description: Order created
@@ -2043,6 +2060,24 @@ components:
           enum: [pending, paid, shipping, completed, cancelled]
         total_amount:
           type: number
+        recipient_name:
+          type: string
+        phone:
+          type: string
+        address_line:
+          type: string
+        city:
+          type: string
+        district:
+          type: string
+        note:
+          type: string
+        shipping_method:
+          type: string
+          enum: [standard, express]
+        payment_method:
+          type: string
+          enum: [cod, demo_payment]
         items:
           type: array
           items:
@@ -2053,6 +2088,46 @@ components:
         updated_at:
           type: string
           format: date-time
+    CheckoutRequest:
+      type: object
+      required:
+        - recipient_name
+        - phone
+        - address_line
+        - city
+        - district
+        - shipping_method
+        - payment_method
+      properties:
+        recipient_name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        phone:
+          type: string
+          minLength: 8
+          maxLength: 32
+        address_line:
+          type: string
+          minLength: 5
+          maxLength: 255
+        city:
+          type: string
+          minLength: 2
+          maxLength: 120
+        district:
+          type: string
+          minLength: 2
+          maxLength: 120
+        note:
+          type: string
+          maxLength: 1000
+        shipping_method:
+          type: string
+          enum: [standard, express]
+        payment_method:
+          type: string
+          enum: [cod, demo_payment]
     UpdateOrderStatusRequest:
       type: object
       required: [status]

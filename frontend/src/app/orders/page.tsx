@@ -25,6 +25,14 @@ function formatDate(date: string) {
   return parsed.toLocaleString("vi-VN");
 }
 
+function shippingLabel(method?: string) {
+  return method === "express" ? "Express delivery" : method === "standard" ? "Standard delivery" : "Not provided";
+}
+
+function paymentLabel(method?: string) {
+  return method === "demo_payment" ? "Demo payment" : method === "cod" ? "COD" : "Not provided";
+}
+
 export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -171,6 +179,22 @@ export default function OrdersPage() {
                 <span className="font-heading text-2xl font-semibold">
                   {formatVND(order.total_amount)}
                 </span>
+              </div>
+              <div className="grid gap-3 rounded-2xl border border-border bg-card/70 p-4 text-sm md:grid-cols-2">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Ship to</p>
+                  <p className="mt-2 font-medium">{order.recipient_name || "Recipient not provided"}</p>
+                  <p className="mt-1 text-muted-foreground">
+                    {[order.address_line, order.district, order.city].filter(Boolean).join(", ") || "Address not provided"}
+                  </p>
+                  {order.phone ? <p className="mt-1 text-muted-foreground">{order.phone}</p> : null}
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Fulfillment</p>
+                  <p className="mt-2 font-medium">{shippingLabel(order.shipping_method)}</p>
+                  <p className="mt-1 text-muted-foreground">Payment: {paymentLabel(order.payment_method)}</p>
+                  {order.note ? <p className="mt-1 text-muted-foreground">Note: {order.note}</p> : null}
+                </div>
               </div>
               <div className="grid gap-2 text-sm">
                 {order.items.map((item) => (

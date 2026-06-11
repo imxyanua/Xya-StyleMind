@@ -133,7 +133,21 @@ async function createBuyerOrder(request: APIRequestContext, suffix: string) {
     },
     token
   );
-  const orderResponse = await apiPost<Order>(request, "/orders", {}, token);
+  const orderResponse = await apiPost<Order>(
+    request,
+    "/orders",
+    {
+      recipient_name: "Admin E2E Buyer",
+      phone: "0901234567",
+      address_line: "99 Admin Flow Street",
+      city: "Ho Chi Minh City",
+      district: "District 3",
+      note: "Admin order management E2E",
+      shipping_method: "standard",
+      payment_method: "cod",
+    },
+    token
+  );
   expect(orderResponse.data?.id).toBeTruthy();
   return { order: orderResponse.data as Order, buyerEmail };
 }
