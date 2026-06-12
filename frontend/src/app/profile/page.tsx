@@ -274,6 +274,9 @@ export default function ProfilePage() {
               <Link href="/wishlist">Open wishlist</Link>
             </Button>
             <Button asChild variant="outline">
+              <Link href="/profile/addresses">Manage addresses</Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href="/cart">Open cart</Link>
             </Button>
             <Button asChild variant="outline">

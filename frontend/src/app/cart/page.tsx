@@ -8,7 +8,15 @@ import { MapPin, ShieldCheck, Truck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { checkoutOrder, fetchCart, removeCartItem, updateCartItem, type CheckoutInput } from "@/lib/api";
+import {
+  checkoutOrder,
+  fetchCart,
+  fetchMyAddresses,
+  removeCartItem,
+  updateCartItem,
+  type CheckoutInput,
+  type UserAddress,
+} from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { PRODUCT_IMAGE_BLUR } from "@/lib/images";
 import { ApiError } from "@/types/api";
@@ -21,6 +29,17 @@ function formatVND(value: number) {
   }).format(value);
 }
 
+function checkoutFieldsFromAddress(address: UserAddress): Partial<CheckoutInput> {
+  return {
+    recipient_name: address.recipient_name ?? "",
+    phone: address.phone ?? "",
+    address_line: address.address_line ?? "",
+    city: address.city ?? "",
+    district: address.district ?? "",
+    note: address.note ?? "",
+  };
+}
+
 export default function CartPage() {
   const router = useRouter();
   const [cart, setCart] = useState<Cart | null>(null);
@@ -29,6 +48,10 @@ export default function CartPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [itemBusyId, setItemBusyId] = useState<string | null>(null);
   const [quantityInputs, setQuantityInputs] = useState<Record<string, number>>({});
+  const [addresses, setAddresses] = useState<UserAddress[]>([]);
+  const [addressesLoading, setAddressesLoading] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
   const [checkoutForm, setCheckoutForm] = useState<CheckoutInput>({
     recipient_name: "",
     phone: "",
@@ -60,6 +83,38 @@ export default function CartPage() {
             seed[item.id] = item.quantity;
           });
           setQuantityInputs(seed);
+        }
+
+        setAddressesLoading(true);
+        setAddressError(null);
+        try {
+          const addressResponse = await fetchMyAddresses();
+          if (!cancelled) {
+            const savedAddresses = addressResponse.data ?? [];
+            setAddresses(savedAddresses);
+            const defaultAddress = savedAddresses.find((address) => address.is_default);
+            if (defaultAddress?.id) {
+              setSelectedAddressId(defaultAddress.id);
+              setCheckoutForm((current) => ({
+                ...current,
+                ...checkoutFieldsFromAddress(defaultAddress),
+              }));
+            }
+          }
+        } catch (addressErr) {
+          if (!cancelled) {
+            if (addressErr instanceof ApiError && addressErr.status === 401) {
+              router.replace("/login?redirect=/cart");
+              return;
+            }
+            setAddressError(
+              addressErr instanceof Error ? addressErr.message : "Saved addresses could not be loaded"
+            );
+          }
+        } finally {
+          if (!cancelled) {
+            setAddressesLoading(false);
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -131,6 +186,21 @@ export default function CartPage() {
 
   function updateCheckoutField<K extends keyof CheckoutInput>(key: K, value: CheckoutInput[K]) {
     setCheckoutForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function applyAddress(address: UserAddress) {
+    setCheckoutForm((current) => ({
+      ...current,
+      ...checkoutFieldsFromAddress(address),
+    }));
+  }
+
+  function onSelectSavedAddress(addressId: string) {
+    setSelectedAddressId(addressId);
+    const selected = addresses.find((address) => address.id === addressId);
+    if (selected) {
+      applyAddress(selected);
+    }
   }
 
   async function onCheckout(event: FormEvent<HTMLFormElement>) {
@@ -261,6 +331,44 @@ export default function CartPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <form id="checkout-form" className="space-y-4" onSubmit={onCheckout}>
+                <div className="space-y-3 rounded-2xl border border-border bg-card/70 p-4 text-sm">
+                  <div className="flex items-center gap-2 font-medium">
+                    <MapPin className="size-4" />
+                    Saved address
+                  </div>
+                  {addressesLoading ? (
+                    <div className="h-10 animate-pulse rounded-xl bg-muted" />
+                  ) : addresses.length > 0 ? (
+                    <div className="space-y-2">
+                      <label htmlFor="saved_address" className="text-xs font-medium text-muted-foreground">
+                        Choose saved address
+                      </label>
+                      <select
+                        id="saved_address"
+                        value={selectedAddressId}
+                        onChange={(event) => onSelectSavedAddress(event.target.value)}
+                        className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                      >
+                        <option value="">Manual address</option>
+                        {addresses.map((address) => (
+                          <option key={address.id} value={address.id}>
+                            {address.is_default ? "Default - " : ""}
+                            {address.recipient_name} / {address.address_line}, {address.district}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      No saved addresses yet. You can type manually or save one from your profile.
+                    </p>
+                  )}
+                  {addressError ? <p className="text-xs text-destructive">{addressError}</p> : null}
+                  <Button asChild variant="outline" size="sm" className="w-full">
+                    <Link href="/profile/addresses">Manage saved addresses</Link>
+                  </Button>
+                </div>
+
                 <div className="space-y-3 rounded-2xl border border-border bg-muted/45 p-4 text-sm">
                   <div className="flex items-center gap-2 font-medium">
                     <MapPin className="size-4" />

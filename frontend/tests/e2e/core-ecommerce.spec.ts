@@ -80,6 +80,22 @@ async function markOrderPaid(orderID: string) {
   }
 }
 
+async function createDefaultAddressThroughUi(page: Page) {
+  await page.goto("/profile/addresses");
+  await expect(page.getByRole("heading", { name: "Address Book" })).toBeVisible();
+  await page.getByLabel("Recipient name").fill("E2E Saved Buyer");
+  await page.getByLabel("Phone").fill("0909876543");
+  await page.getByLabel("Address").fill("77 Saved Address Lane");
+  await page.getByLabel("City").fill("Ho Chi Minh City");
+  await page.getByLabel("District").fill("District 7");
+  await page.getByLabel("Delivery note").fill("Saved address note");
+  await page.getByRole("button", { name: "Save address" }).click();
+  await expect(page.getByText("Address saved.")).toBeVisible();
+  await page.getByRole("button", { name: "Set default" }).first().click();
+  await expect(page.getByText("Default address updated.")).toBeVisible();
+  await expect(page.getByText("E2E Saved Buyer").last()).toBeVisible();
+}
+
 test("core ecommerce flows work against the real backend", async ({ page, request }) => {
   const productsResponse = await apiGet<Product[]>(
     request,
@@ -112,6 +128,7 @@ test("core ecommerce flows work against the real backend", async ({ page, reques
   await page.goto("/cart");
   await expect(page).toHaveURL(/\/login\?redirect=\/cart/);
   await loginThroughUi(page, email);
+  await createDefaultAddressThroughUi(page);
 
   await page.goto(`/products/${selectedProduct.id}`);
   await expect(page.getByRole("heading", { name: selectedProduct.name })).toBeVisible();
@@ -152,19 +169,19 @@ test("core ecommerce flows work against the real backend", async ({ page, reques
   await expect(page.getByText(selectedProduct.name)).toBeVisible();
   await page.getByRole("spinbutton").first().fill("2");
   await page.getByRole("button", { name: "Update" }).first().click();
-  await page.getByLabel("Recipient name").fill("E2E Fashion Buyer");
-  await page.getByLabel("Phone").fill("0901234567");
-  await page.getByLabel("Address").fill("88 E2E Style Street");
-  await page.getByLabel("City").fill("Ho Chi Minh City");
-  await page.getByLabel("District").fill("District 1");
-  await page.getByLabel("Delivery note").fill("E2E delivery note");
+  await expect(page.getByLabel("Recipient name")).toHaveValue("E2E Saved Buyer");
+  await expect(page.getByLabel("Phone")).toHaveValue("0909876543");
+  await expect(page.getByLabel("Address")).toHaveValue("77 Saved Address Lane");
+  await expect(page.getByLabel("City")).toHaveValue("Ho Chi Minh City");
+  await expect(page.getByLabel("District")).toHaveValue("District 7");
+  await expect(page.getByLabel("Delivery note")).toHaveValue("Saved address note");
   await page.getByLabel("Shipping method").selectOption("express");
   await page.getByLabel("Payment method").selectOption("demo_payment");
   await page.getByRole("button", { name: "Checkout" }).click();
   await expect(page).toHaveURL(/\/orders/);
   await expect(page.getByText(selectedProduct.name)).toBeVisible();
-  await expect(page.getByText("E2E Fashion Buyer")).toBeVisible();
-  await expect(page.getByText(/88 E2E Style Street/)).toBeVisible();
+  await expect(page.getByText("E2E Saved Buyer")).toBeVisible();
+  await expect(page.getByText(/77 Saved Address Lane/)).toBeVisible();
   await expect(page.getByText("Express delivery").first()).toBeVisible();
   await expect(page.getByText("Payment: Demo payment")).toBeVisible();
 
@@ -183,8 +200,8 @@ test("core ecommerce flows work against the real backend", async ({ page, reques
   await expect(page.getByText("Order summary")).toBeVisible();
   await expect(page.getByText("Payment", { exact: true })).toBeVisible();
   await expect(page.getByText(selectedProduct.name)).toBeVisible();
-  await expect(page.getByText("E2E Fashion Buyer")).toBeVisible();
-  await expect(page.getByText(/88 E2E Style Street/)).toBeVisible();
+  await expect(page.getByText("E2E Saved Buyer")).toBeVisible();
+  await expect(page.getByText(/77 Saved Address Lane/)).toBeVisible();
   await expect(page.getByText("Express delivery").first()).toBeVisible();
   await expect(page.getByText("Demo payment").first()).toBeVisible();
 

@@ -95,6 +95,24 @@ func TestOrderCheckoutDetailsMigrationIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestUserAddressesMigrationHasDefaultConstraint(t *testing.T) {
+	sql := readMigrationForTest(t, "0009_create_user_addresses.sql")
+
+	required := []string{
+		"CREATE TABLE IF NOT EXISTS user_addresses",
+		"REFERENCES users(id) ON DELETE CASCADE",
+		"CREATE INDEX IF NOT EXISTS idx_user_addresses_user_id",
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_user_addresses_one_default",
+		"WHERE is_default = TRUE",
+	}
+
+	for _, text := range required {
+		if !strings.Contains(sql, text) {
+			t.Fatalf("user addresses migration missing %q", text)
+		}
+	}
+}
+
 func migrationFilesForTest(t *testing.T) []string {
 	t.Helper()
 

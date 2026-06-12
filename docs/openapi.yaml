@@ -1,4 +1,4 @@
-﻿openapi: 3.0.3
+openapi: 3.0.3
 info:
   title: Xya-StyleMind Backend API
   version: 0.1.0
@@ -986,6 +986,178 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/me/addresses:
+    get:
+      tags: [Profile]
+      summary: List current user's saved addresses
+      operationId: listMyAddresses
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Saved addresses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAddressListResponseEnvelope'
+              examples:
+                default:
+                  value:
+                    success: true
+                    message: ok
+                    data:
+                      - id: 940c2d92-57b1-4635-b8a5-2093fef17429
+                        user_id: 5c3eb7aa-a3b8-4f1f-a9d4-1e4e4e2db222
+                        recipient_name: Nguyen Van A
+                        phone: '0901234567'
+                        address_line: 123 Nguyen Trai
+                        city: Ho Chi Minh City
+                        district: District 1
+                        note: Call before delivery
+                        is_default: true
+                        created_at: '2026-06-06T05:00:00Z'
+                        updated_at: '2026-06-06T05:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Profile]
+      summary: Create saved address
+      operationId: createMyAddress
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressRequest'
+            examples:
+              default:
+                value:
+                  recipient_name: Nguyen Van A
+                  phone: '0901234567'
+                  address_line: 123 Nguyen Trai
+                  city: Ho Chi Minh City
+                  district: District 1
+                  note: Call before delivery
+                  is_default: true
+      responses:
+        '201':
+          description: Address created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAddressResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/me/addresses/{id}:
+    patch:
+      tags: [Profile]
+      summary: Update saved address
+      operationId: updateMyAddress
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressRequest'
+      responses:
+        '200':
+          description: Address updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAddressResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Profile]
+      summary: Delete saved address
+      operationId: deleteMyAddress
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Address deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IDResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/me/addresses/{id}/default:
+    patch:
+      tags: [Profile]
+      summary: Set saved address as default
+      operationId: setDefaultMyAddress
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Default address updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAddressResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/wishlist:
     get:
       tags: [Wishlist]
@@ -1923,6 +2095,84 @@ components:
             $ref: '#/components/schemas/Product'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
+    UserAddress:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        recipient_name:
+          type: string
+        phone:
+          type: string
+        address_line:
+          type: string
+        city:
+          type: string
+        district:
+          type: string
+        note:
+          type: string
+        is_default:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AddressRequest:
+      type: object
+      required: [recipient_name, phone, address_line, city, district]
+      properties:
+        recipient_name:
+          type: string
+          minLength: 2
+          maxLength: 120
+        phone:
+          type: string
+          minLength: 8
+          maxLength: 32
+        address_line:
+          type: string
+          minLength: 5
+          maxLength: 255
+        city:
+          type: string
+          minLength: 2
+          maxLength: 120
+        district:
+          type: string
+          minLength: 2
+          maxLength: 120
+        note:
+          type: string
+          maxLength: 1000
+        is_default:
+          type: boolean
+    UserAddressResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/UserAddress'
+    UserAddressListResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserAddress'
     CartProduct:
       type: object
       properties:

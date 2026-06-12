@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"stylemind/internal/address"
 	"stylemind/internal/audit"
 	"stylemind/internal/auth"
 	"stylemind/internal/cart"
@@ -116,6 +117,10 @@ func main() {
 		authRateLimit.Middleware("auth:login", middleware.IPKeyExtractor, middleware.EmailKeyExtractor),
 		authRateLimit.Middleware("auth:register", middleware.IPKeyExtractor, middleware.EmailKeyExtractor),
 	)
+
+	addressRepo := address.NewRepository(db)
+	addressService := address.NewService(addressRepo)
+	address.RegisterRoutes(api, jwtAuth, addressService)
 
 	admin := api.Group("/admin")
 	admin.Use(jwtAuth, middleware.RequireRole("admin"))

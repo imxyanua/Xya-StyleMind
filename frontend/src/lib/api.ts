@@ -219,12 +219,40 @@ export async function removeCartItem(itemId: string) {
 }
 
 export type CheckoutInput = components["schemas"]["CheckoutRequest"];
+export type UserAddress = components["schemas"]["UserAddress"];
+export type AddressInput = components["schemas"]["AddressRequest"];
 
 export async function checkoutOrder(input: CheckoutInput) {
   return apiRequest<Order>("/orders", {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export async function fetchMyAddresses() {
+  return apiRequest<UserAddress[]>("/me/addresses", { method: "GET" });
+}
+
+export async function createMyAddress(input: AddressInput) {
+  return apiRequest<UserAddress>("/me/addresses", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateMyAddress(id: string, input: AddressInput) {
+  return apiRequest<UserAddress>(`/me/addresses/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteMyAddress(id: string) {
+  return apiRequest<{ id: string }>(`/me/addresses/${id}`, { method: "DELETE" });
+}
+
+export async function setDefaultMyAddress(id: string) {
+  return apiRequest<UserAddress>(`/me/addresses/${id}/default`, { method: "PATCH" });
 }
 
 type OrderListParams = {

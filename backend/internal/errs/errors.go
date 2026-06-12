@@ -17,6 +17,7 @@ var (
 	ErrCannotDisableSelf            = errors.New("cannot disable yourself")
 	ErrCannotDisableLastAdmin       = errors.New("cannot disable the last admin")
 	ErrUserDisabled                 = errors.New("user disabled")
+	ErrAddressNotFound              = errors.New("address not found")
 	ErrProductNotFound              = errors.New("product not found")
 	ErrCategoryNotFound             = errors.New("category not found")
 	ErrCartEmpty                    = errors.New("cart is empty")
