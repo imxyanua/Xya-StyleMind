@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -9,11 +9,12 @@ import { ArrowLeft, CheckCircle2, Clock3, CreditCard, MapPin, PackageCheck, Truc
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchMyOrder } from "@/lib/api";
+import { createReturnRequest, fetchMyOrder, fetchMyReturnRequests } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { PRODUCT_IMAGE_BLUR } from "@/lib/images";
 import { ApiError } from "@/types/api";
 import type { Order } from "@/types/order";
+import type { ReturnRequest, ReturnRequestStatus } from "@/types/return";
 
 const timelineSteps = ["pending", "paid", "shipping", "completed"] as const;
 
@@ -25,6 +26,13 @@ const statusTone: Record<Order["status"], "secondary" | "outline" | "destructive
   shipping: "outline",
   completed: "secondary",
   cancelled: "destructive",
+};
+
+const returnStatusTone: Record<ReturnRequestStatus, "secondary" | "outline" | "destructive"> = {
+  requested: "outline",
+  approved: "secondary",
+  rejected: "destructive",
+  cancelled: "outline",
 };
 
 function formatVND(value?: number) {
@@ -70,6 +78,14 @@ function paymentStatusTone(status?: Order["payment_status"]) {
 
 function statusLabel(status: string) {
   return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function canCreateReturnRequest(order: Order, requests: ReturnRequest[]) {
+  const eligibleStatus = ["paid", "shipping", "completed"].includes(order.status);
+  const hasActiveRequest = requests.some(
+    (request) => request.order_id === order.id && ["requested", "approved"].includes(request.status)
+  );
+  return eligibleStatus && !hasActiveRequest;
 }
 
 function Timeline({ status }: { status: Order["status"] }) {
@@ -124,6 +140,11 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [returnRequests, setReturnRequests] = useState<ReturnRequest[]>([]);
+  const [returnReason, setReturnReason] = useState("");
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [returnError, setReturnError] = useState<string | null>(null);
+  const [returnSuccess, setReturnSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (!orderId) {
@@ -141,9 +162,13 @@ export default function OrderDetailPage() {
       setError(null);
       setNotFound(false);
       try {
-        const response = await fetchMyOrder(idForRequest);
+        const [response, returnResponse] = await Promise.all([
+          fetchMyOrder(idForRequest),
+          fetchMyReturnRequests({ page: 1, limit: 50 }),
+        ]);
         if (!cancelled) {
           setOrder(response.data ?? null);
+          setReturnRequests((returnResponse.data ?? []).filter((item) => item.order_id === idForRequest));
         }
       } catch (err) {
         if (cancelled) {
@@ -174,6 +199,50 @@ export default function OrderDetailPage() {
   const subtotal = useMemo(() => {
     return order?.items.reduce((sum, item) => sum + (item.subtotal ?? 0), 0) ?? 0;
   }, [order]);
+
+  const returnAllowed = useMemo(() => {
+    return order ? canCreateReturnRequest(order, returnRequests) : false;
+  }, [order, returnRequests]);
+
+  async function submitReturnRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!order) {
+      return;
+    }
+
+    const normalizedReason = returnReason.trim();
+    if (normalizedReason.length < 10) {
+      setReturnError("Please describe the return reason in at least 10 characters.");
+      return;
+    }
+    if (normalizedReason.length > 1000) {
+      setReturnError("Return reason must be 1000 characters or fewer.");
+      return;
+    }
+
+    setReturnSubmitting(true);
+    setReturnError(null);
+    setReturnSuccess(null);
+    try {
+      const response = await createReturnRequest(order.id, { reason: normalizedReason });
+      const created = response.data;
+      if (created) {
+        setReturnRequests((current) => [created, ...current.filter((item) => item.id !== created.id)]);
+      }
+      setReturnReason("");
+      setReturnSuccess("Return/refund request submitted. Admin will review it soon.");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        setReturnError("This order is not eligible for a return request yet.");
+      } else if (err instanceof ApiError && err.status === 409) {
+        setReturnError("This order already has an active return request.");
+      } else {
+        setReturnError(err instanceof Error ? err.message : "Failed to submit return request");
+      }
+    } finally {
+      setReturnSubmitting(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -359,6 +428,71 @@ export default function OrderDetailPage() {
               <p className="leading-6 text-muted-foreground">
                 No real card or bank credentials are stored for this demo checkout.
               </p>
+            </CardContent>
+          </Card>
+
+          <Card className="surface-card rounded-[1.75rem]">
+            <CardHeader>
+              <CardTitle className="text-3xl">Returns & refunds</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              {returnRequests.length > 0 ? (
+                <div className="space-y-3">
+                  {returnRequests.map((request) => (
+                    <div key={request.id} className="rounded-2xl border border-border bg-card/70 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-medium">Request #{request.id.slice(0, 8)}</p>
+                        <Badge variant={returnStatusTone[request.status]} className="capitalize">
+                          {request.status}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 line-clamp-4 text-muted-foreground">{request.reason}</p>
+                      {request.admin_note ? (
+                        <p className="mt-2 rounded-xl bg-muted/70 p-3 text-xs text-muted-foreground">
+                          Admin note: {request.admin_note}
+                        </p>
+                      ) : null}
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Submitted {formatDate(request.created_at)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {returnAllowed ? (
+                <form className="space-y-3" onSubmit={submitReturnRequest}>
+                  <div className="space-y-1.5">
+                    <label htmlFor="return-reason" className="text-sm font-medium">
+                      Return reason
+                    </label>
+                    <textarea
+                      id="return-reason"
+                      className="min-h-28 w-full rounded-2xl border border-input bg-card px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                      value={returnReason}
+                      onChange={(event) => setReturnReason(event.target.value)}
+                      placeholder="Tell us why you want to return or refund this order."
+                      maxLength={1000}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">{returnReason.length}/1000 characters</p>
+                  </div>
+                  {returnError ? (
+                    <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      {returnError}
+                    </p>
+                  ) : null}
+                  {returnSuccess ? <p className="text-sm text-primary">{returnSuccess}</p> : null}
+                  <Button type="submit" disabled={returnSubmitting}>
+                    {returnSubmitting ? "Submitting..." : "Request return/refund"}
+                  </Button>
+                </form>
+              ) : (
+                <div className="rounded-2xl bg-muted/60 p-4 text-muted-foreground">
+                  Return requests are available after an order is paid, shipping, or completed, and
+                  only when no active request exists.
+                </div>
+              )}
             </CardContent>
           </Card>
 

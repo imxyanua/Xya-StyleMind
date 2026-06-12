@@ -8,10 +8,11 @@ import { CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchMyOrders } from "@/lib/api";
+import { fetchMyOrders, fetchMyReturnRequests } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { ApiError, type PaginationMeta } from "@/types/api";
 import type { Order } from "@/types/order";
+import type { ReturnRequest, ReturnRequestStatus } from "@/types/return";
 
 function formatVND(value: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -49,9 +50,17 @@ function paymentStatusTone(status?: Order["payment_status"]) {
   }
 }
 
+const returnStatusTone: Record<ReturnRequestStatus, "secondary" | "outline" | "destructive"> = {
+  requested: "outline",
+  approved: "secondary",
+  rejected: "destructive",
+  cancelled: "outline",
+};
+
 export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [returnRequests, setReturnRequests] = useState<ReturnRequest[]>([]);
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -73,10 +82,14 @@ export default function OrdersPage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetchMyOrders({ page, limit: 20 });
+        const [res, returnsRes] = await Promise.all([
+          fetchMyOrders({ page, limit: 20 }),
+          fetchMyReturnRequests({ page: 1, limit: 20 }),
+        ]);
         if (!cancelled) {
           setOrders(res.data ?? []);
           setMeta(res.meta ?? null);
+          setReturnRequests(returnsRes.data ?? []);
         }
       } catch (err) {
         if (!cancelled) {
@@ -248,6 +261,40 @@ export default function OrdersPage() {
           </Card>
         ))}
       </div>
+
+      {returnRequests.length > 0 ? (
+        <Card className="surface-card rounded-[1.75rem]">
+          <CardHeader>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="eyebrow">After-sales support</p>
+                <CardTitle className="mt-2 text-3xl">Return Requests</CardTitle>
+              </div>
+              <Badge variant="outline">{returnRequests.length} recent</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            {returnRequests.map((request) => (
+              <Link
+                key={request.id}
+                href={`/orders/${request.order_id}`}
+                className="rounded-3xl border border-border bg-card/70 p-4 transition hover:bg-muted/50"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-mono text-sm font-semibold">Order #{request.order_id.slice(0, 8)}</p>
+                  <Badge variant={returnStatusTone[request.status]} className="capitalize">
+                    {request.status}
+                  </Badge>
+                </div>
+                <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{request.reason}</p>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Submitted {formatDate(request.created_at)}
+                </p>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {orders.length > 0 ? (
         <div className="surface-card flex items-center justify-between rounded-[1.5rem] p-4">

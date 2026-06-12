@@ -131,6 +131,26 @@ func TestOrderPaymentStatusMigrationIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestReturnRequestsMigrationHasConstraints(t *testing.T) {
+	sql := readMigrationForTest(t, "0011_create_return_requests.sql")
+
+	required := []string{
+		"CREATE TABLE IF NOT EXISTS return_requests",
+		"order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE",
+		"user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE",
+		"CHECK (status IN ('requested', 'approved', 'rejected', 'cancelled'))",
+		"CREATE INDEX IF NOT EXISTS idx_return_requests_user_created_at",
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_return_requests_active_order",
+		"WHERE status IN ('requested', 'approved')",
+	}
+
+	for _, text := range required {
+		if !strings.Contains(sql, text) {
+			t.Fatalf("return requests migration missing %q", text)
+		}
+	}
+}
+
 func migrationFilesForTest(t *testing.T) []string {
 	t.Helper()
 

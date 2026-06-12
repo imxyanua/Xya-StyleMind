@@ -7,6 +7,7 @@ import type { components, operations } from "@/types/openapi";
 import type { Order } from "@/types/order";
 import type { Product } from "@/types/product";
 import type { RatingSummary, Review } from "@/types/review";
+import type { ReturnRequest } from "@/types/return";
 import type { AdminUser } from "@/types/user";
 import type { WishlistItem } from "@/types/wishlist";
 
@@ -274,6 +275,65 @@ export async function fetchMyOrders(params: OrderListParams = {}) {
 
 export async function fetchMyOrder(id: string) {
   return apiRequest<Order>(`/orders/${id}`, { method: "GET" });
+}
+
+export type CreateReturnRequestInput = components["schemas"]["CreateReturnRequest"];
+export type UpdateReturnRequestStatusInput =
+  components["schemas"]["UpdateReturnRequestStatusRequest"];
+export type MyReturnRequestListParams = NonNullable<
+  operations["listMyReturnRequests"]["parameters"]["query"]
+>;
+export type AdminReturnRequestListParams = NonNullable<
+  operations["listAdminReturnRequests"]["parameters"]["query"]
+>;
+
+export async function createReturnRequest(orderId: string, input: CreateReturnRequestInput) {
+  return apiRequest<ReturnRequest>(`/orders/${orderId}/return-requests`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function fetchMyReturnRequests(params: MyReturnRequestListParams = {}) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || (typeof value === "string" && value === "")) {
+      continue;
+    }
+    searchParams.set(key, String(value));
+  }
+  const query = searchParams.toString();
+  return apiRequest<ReturnRequest[]>(`/me/return-requests${query ? `?${query}` : ""}`, {
+    method: "GET",
+  });
+}
+
+export async function fetchAdminReturnRequests(params: AdminReturnRequestListParams = {}) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+    searchParams.set(key, String(value));
+  }
+  const query = searchParams.toString();
+  return apiRequest<ReturnRequest[]>(`/admin/return-requests${query ? `?${query}` : ""}`, {
+    method: "GET",
+  });
+}
+
+export async function fetchAdminReturnRequest(id: string) {
+  return apiRequest<ReturnRequest>(`/admin/return-requests/${id}`, { method: "GET" });
+}
+
+export async function updateReturnRequestStatus(
+  id: string,
+  input: UpdateReturnRequestStatusInput
+) {
+  return apiRequest<ReturnRequest>(`/admin/return-requests/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
 }
 
 export type AdminOrderListParams = NonNullable<

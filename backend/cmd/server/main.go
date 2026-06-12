@@ -22,6 +22,7 @@ import (
 	"stylemind/internal/middleware"
 	"stylemind/internal/order"
 	"stylemind/internal/product"
+	"stylemind/internal/returns"
 	"stylemind/internal/review"
 	"stylemind/internal/user"
 	"stylemind/internal/wishlist"
@@ -160,6 +161,10 @@ func main() {
 	orderRepo := order.NewRepository(db)
 	orderService := order.NewService(orderRepo)
 	order.RegisterRoutes(api, admin, jwtAuth, orderService, auditService)
+
+	returnRepo := returns.NewRepository(db)
+	returnService := returns.NewService(returnRepo)
+	returns.RegisterRoutes(api, admin, jwtAuth, returnService, auditService)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

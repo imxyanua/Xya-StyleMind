@@ -511,6 +511,45 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/orders/{id}/return-requests:
+    post:
+      tags: [Returns]
+      summary: Request a return or refund for an order
+      description: Authenticated users can request returns for their own paid, shipping, or completed orders.
+      operationId: createReturnRequest
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReturnRequest'
+            examples:
+              default:
+                value:
+                  reason: The size does not fit and I would like a refund.
+      responses:
+        '201':
+          description: Return request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnRequestResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/admin/orders:
     get:
       tags: [Orders]
@@ -663,6 +702,146 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/return-requests:
+    get:
+      tags: [Returns]
+      summary: List return requests
+      description: Admin only.
+      operationId: listAdminReturnRequests
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [requested, approved, rejected, cancelled]
+        - name: user_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: order_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, oldest]
+            default: newest
+      responses:
+        '200':
+          description: Return request list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnRequestListResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/return-requests/{id}:
+    get:
+      tags: [Returns]
+      summary: Get return request detail
+      description: Admin only.
+      operationId: getAdminReturnRequest
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Return request detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnRequestResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/return-requests/{id}/status:
+    patch:
+      tags: [Returns]
+      summary: Update return request status
+      description: Admin only. Approving a return request attempts to set the linked order payment_status to refunded.
+      operationId: updateReturnRequestStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReturnRequestStatusRequest'
+            examples:
+              approve:
+                value:
+                  status: approved
+                  admin_note: Refund approved by support.
+              reject:
+                value:
+                  status: rejected
+                  admin_note: Item condition is not eligible.
+      responses:
+        '200':
+          description: Return request updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnRequestResponseEnvelope'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1021,6 +1200,29 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/me/return-requests:
+    get:
+      tags: [Returns]
+      summary: List current user's return requests
+      operationId: listMyReturnRequests
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: User return requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReturnRequestListResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -2454,6 +2656,115 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Order'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    ReturnOrder:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, paid, shipping, completed, cancelled]
+        payment_status:
+          type: string
+          enum: [unpaid, pending, paid, failed, refunded]
+        payment_method:
+          type: string
+          enum: [cod, demo_payment]
+        total_amount:
+          type: number
+        recipient_name:
+          type: string
+        shipping_method:
+          type: string
+          enum: [standard, express]
+        created_at:
+          type: string
+          format: date-time
+    ReturnUser:
+      type: object
+      description: Minimal user info for admin return management. Does not include password hashes or tokens.
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+    ReturnRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        order_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [requested, approved, rejected, cancelled]
+        admin_note:
+          type: string
+        order:
+          $ref: '#/components/schemas/ReturnOrder'
+        user:
+          $ref: '#/components/schemas/ReturnUser'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    CreateReturnRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 1000
+    UpdateReturnRequestStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected, cancelled]
+        admin_note:
+          type: string
+          maxLength: 1000
+    ReturnRequestResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ReturnRequest'
+    ReturnRequestListResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReturnRequest'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
     OrdersByStatus:

@@ -272,6 +272,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orders/{id}/return-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a return or refund for an order
+         * @description Authenticated users can request returns for their own paid, shipping, or completed orders.
+         */
+        post: operations["createReturnRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/orders": {
         parameters: {
             query?: never;
@@ -350,6 +370,66 @@ export interface paths {
          * @description Admin only. Allowed payment statuses are unpaid, pending, paid, failed, refunded.
          */
         patch: operations["updateOrderPaymentStatus"];
+        trace?: never;
+    };
+    "/api/v1/admin/return-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List return requests
+         * @description Admin only.
+         */
+        get: operations["listAdminReturnRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/return-requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get return request detail
+         * @description Admin only.
+         */
+        get: operations["getAdminReturnRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/return-requests/{id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update return request status
+         * @description Admin only. Approving a return request attempts to set the linked order payment_status to refunded.
+         */
+        patch: operations["updateReturnRequestStatus"];
         trace?: never;
     };
     "/api/v1/admin/users": {
@@ -464,6 +544,23 @@ export interface paths {
          * @description Admin only. Returns persisted audit logs for sensitive admin actions. Metadata is sanitized and does not include passwords, tokens, secrets, or raw Authorization headers.
          */
         get: operations["listAdminAuditLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/return-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List current user's return requests */
+        get: operations["listMyReturnRequests"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1104,6 +1201,69 @@ export interface components {
             success?: boolean;
             message?: string;
             data?: components["schemas"]["Order"][];
+            meta?: components["schemas"]["PaginationMeta"];
+        };
+        ReturnOrder: {
+            /** Format: uuid */
+            id?: string;
+            /** @enum {string} */
+            status?: "pending" | "paid" | "shipping" | "completed" | "cancelled";
+            /** @enum {string} */
+            payment_status?: "unpaid" | "pending" | "paid" | "failed" | "refunded";
+            /** @enum {string} */
+            payment_method?: "cod" | "demo_payment";
+            total_amount?: number;
+            recipient_name?: string;
+            /** @enum {string} */
+            shipping_method?: "standard" | "express";
+            /** Format: date-time */
+            created_at?: string;
+        };
+        /** @description Minimal user info for admin return management. Does not include password hashes or tokens. */
+        ReturnUser: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: email */
+            email?: string;
+            full_name?: string;
+            /** @enum {string} */
+            role?: "user" | "admin";
+        };
+        ReturnRequest: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            order_id?: string;
+            /** Format: uuid */
+            user_id?: string;
+            reason?: string;
+            /** @enum {string} */
+            status?: "requested" | "approved" | "rejected" | "cancelled";
+            admin_note?: string;
+            order?: components["schemas"]["ReturnOrder"];
+            user?: components["schemas"]["ReturnUser"];
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        CreateReturnRequest: {
+            reason: string;
+        };
+        UpdateReturnRequestStatusRequest: {
+            /** @enum {string} */
+            status: "approved" | "rejected" | "cancelled";
+            admin_note?: string;
+        };
+        ReturnRequestResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["ReturnRequest"];
+        };
+        ReturnRequestListResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["ReturnRequest"][];
             meta?: components["schemas"]["PaginationMeta"];
         };
         OrdersByStatus: {
@@ -1940,6 +2100,38 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
+    createReturnRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderIDPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReturnRequest"];
+            };
+        };
+        responses: {
+            /** @description Return request created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnRequestResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     listAdminOrders: {
         parameters: {
             query?: {
@@ -2060,6 +2252,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrderResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listAdminReturnRequests: {
+        parameters: {
+            query?: {
+                /** @example 1 */
+                page?: components["parameters"]["PageParam"];
+                /** @example 20 */
+                limit?: components["parameters"]["LimitParam"];
+                status?: "requested" | "approved" | "rejected" | "cancelled";
+                user_id?: string;
+                order_id?: string;
+                from?: string;
+                to?: string;
+                sort?: "newest" | "oldest";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Return request list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnRequestListResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getAdminReturnRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Return request detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnRequestResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateReturnRequestStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateReturnRequestStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Return request updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnRequestResponseEnvelope"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -2265,6 +2553,34 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listMyReturnRequests: {
+        parameters: {
+            query?: {
+                /** @example 1 */
+                page?: components["parameters"]["PageParam"];
+                /** @example 20 */
+                limit?: components["parameters"]["LimitParam"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description User return requests */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReturnRequestListResponseEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
         };

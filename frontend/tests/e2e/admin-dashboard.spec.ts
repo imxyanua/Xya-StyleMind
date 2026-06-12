@@ -166,6 +166,8 @@ test("admin auth protects dashboard access", async ({ page, request }) => {
   await expect(page.getByText("Admin access required.")).toBeVisible();
   await page.goto("/admin/orders");
   await expect(page.getByText("Admin access required.")).toBeVisible();
+  await page.goto("/admin/returns");
+  await expect(page.getByText("Admin access required.")).toBeVisible();
   await page.goto("/admin/activity");
   await expect(page.getByText("Admin access required.")).toBeVisible();
   await page.goto("/admin/users");
@@ -182,6 +184,7 @@ test("admin auth protects dashboard access", async ({ page, request }) => {
   await expect(page.getByRole("main").getByRole("link", { name: "Products", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("main").getByRole("link", { name: "Categories", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("main").getByRole("link", { name: "Orders", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "Returns", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("main").getByRole("link", { name: "Users", exact: true }).first()).toBeVisible();
   await expect(page.getByRole("main").getByRole("link", { name: "Activity", exact: true }).first()).toBeVisible();
 });
@@ -443,4 +446,59 @@ test("admin can update order status and sees invalid transition errors", async (
   await expect(page.getByText("admin.order_payment_status.update").first()).toBeVisible();
   await expect(page.getByText(/\"old_payment_status\": \"unpaid\"/).first()).toBeVisible();
   await expect(page.getByText(/\"new_payment_status\": \"paid\"/).first()).toBeVisible();
+});
+
+test("user can request a return and admin can approve refund", async ({ page, request }) => {
+  const suffix = String(Date.now());
+  const { order, buyerEmail } = await createBuyerOrder(request, `returns-${suffix}`);
+  const adminEmail = await setupAdmin(page, request, `returns-${suffix}`);
+
+  await page.goto("/admin/orders");
+  await page.getByLabel("Search order ID").fill(order.id);
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page.getByText(order.id)).toBeVisible();
+
+  await page.getByLabel("Order ID", { exact: true }).fill(order.id);
+  await page.getByLabel("Status", { exact: true }).selectOption("paid");
+  await page.getByRole("button", { name: "Update status" }).click();
+  await expect(page.getByText("Order status updated.")).toBeVisible();
+
+  await page.getByLabel("Payment status").selectOption("paid");
+  await page.getByRole("button", { name: "Update payment status" }).click();
+  await expect(page.getByText("Payment status updated.")).toBeVisible();
+
+  await page.evaluate(() => window.localStorage.removeItem("stylemind_token"));
+  await loginThroughUi(page, buyerEmail);
+  await page.goto(`/orders/${order.id}`);
+  await expect(page.getByText("Returns & refunds")).toBeVisible();
+  await page.getByLabel("Return reason").fill("The jacket does not fit the E2E buyer as expected.");
+  await page.getByRole("button", { name: "Request return/refund" }).click();
+  await expect(page.getByText("Return/refund request submitted.")).toBeVisible();
+  await expect(page.getByText("requested", { exact: true }).first()).toBeVisible();
+
+  await page.evaluate(() => window.localStorage.removeItem("stylemind_token"));
+  await loginThroughUi(page, adminEmail);
+  await page.goto("/admin/returns");
+  await expect(page.getByRole("heading", { name: "Return Requests" })).toBeVisible();
+  await page.getByLabel("Order ID").fill(order.id);
+  await page.getByRole("button", { name: "Apply filters" }).click();
+  await expect(page.getByText(order.id.slice(0, 8)).first()).toBeVisible();
+  await page.getByText(order.id.slice(0, 8)).first().click();
+  await expect(page.getByText("The jacket does not fit the E2E buyer as expected.")).toBeVisible();
+  await page.getByLabel("Decision").selectOption("approved");
+  await page.getByLabel("Admin note").fill("Approved by E2E admin after inspection.");
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("Confirm approved return request");
+    await dialog.accept();
+  });
+  await page.getByRole("button", { name: "Update return request" }).click();
+  await expect(page.getByText("Return approved.")).toBeVisible();
+  await expect(page.getByText("Payment refunded").first()).toBeVisible();
+
+  await page.evaluate(() => window.localStorage.removeItem("stylemind_token"));
+  await loginThroughUi(page, buyerEmail);
+  await page.goto(`/orders/${order.id}`);
+  await expect(page.getByText("Payment status: refunded").first()).toBeVisible();
+  await expect(page.getByText("approved", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Approved by E2E admin after inspection.")).toBeVisible();
 });
