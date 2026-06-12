@@ -2,6 +2,7 @@ import { ApiError, type ApiResponse } from "@/types/api";
 import type { AuditLog } from "@/types/audit";
 import type { Cart } from "@/types/cart";
 import type { Category } from "@/types/category";
+import type { ApplyCouponResult, Coupon } from "@/types/coupon";
 import type { AdminDashboardStats } from "@/types/dashboard";
 import type { components, operations } from "@/types/openapi";
 import type { Order } from "@/types/order";
@@ -208,6 +209,19 @@ export async function fetchCart() {
   return apiRequest<Cart>("/cart", { method: "GET" });
 }
 
+export type ApplyCouponInput = components["schemas"]["ApplyCouponRequest"];
+export type CouponInput = components["schemas"]["CouponMutationRequest"];
+export type AdminCouponListParams = NonNullable<
+  operations["listAdminCoupons"]["parameters"]["query"]
+>;
+
+export async function applyCouponToCart(input: ApplyCouponInput) {
+  return apiRequest<ApplyCouponResult>("/cart/apply-coupon", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function updateCartItem(itemId: string, quantity: number) {
   return apiRequest<Cart>(`/cart/items/${itemId}`, {
     method: "PUT",
@@ -370,6 +384,36 @@ export async function updateOrderPaymentStatus(id: string, input: UpdateOrderPay
     method: "PATCH",
     body: JSON.stringify(input),
   });
+}
+
+export async function fetchAdminCoupons(params: AdminCouponListParams = {}) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || (typeof value === "string" && value === "")) {
+      continue;
+    }
+    searchParams.set(key, String(value));
+  }
+  const query = searchParams.toString();
+  return apiRequest<Coupon[]>(`/admin/coupons${query ? `?${query}` : ""}`, { method: "GET" });
+}
+
+export async function createCoupon(input: CouponInput) {
+  return apiRequest<Coupon>("/admin/coupons", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateCoupon(id: string, input: CouponInput) {
+  return apiRequest<Coupon>(`/admin/coupons/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteCoupon(id: string) {
+  return apiRequest<{ id: string }>(`/admin/coupons/${id}`, { method: "DELETE" });
 }
 
 export type AdminAuditLogListParams = NonNullable<

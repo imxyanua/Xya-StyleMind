@@ -23,6 +23,10 @@ type Order struct {
 	UserID         string    `json:"user_id"`
 	Status         string    `json:"status"`
 	PaymentStatus  string    `json:"payment_status"`
+	SubtotalAmount float64   `json:"subtotal_amount"`
+	DiscountAmount float64   `json:"discount_amount"`
+	CouponID       string    `json:"coupon_id,omitempty"`
+	CouponCode     string    `json:"coupon_code,omitempty"`
 	TotalAmount    float64   `json:"total_amount"`
 	RecipientName  string    `json:"recipient_name,omitempty"`
 	Phone          string    `json:"phone,omitempty"`
@@ -66,6 +70,10 @@ type OrderResponse struct {
 	User           *OrderUser  `json:"user,omitempty"`
 	Status         string      `json:"status"`
 	PaymentStatus  string      `json:"payment_status"`
+	SubtotalAmount float64     `json:"subtotal_amount"`
+	DiscountAmount float64     `json:"discount_amount"`
+	CouponID       string      `json:"coupon_id,omitempty"`
+	CouponCode     string      `json:"coupon_code,omitempty"`
 	TotalAmount    float64     `json:"total_amount"`
 	RecipientName  string      `json:"recipient_name,omitempty"`
 	Phone          string      `json:"phone,omitempty"`
@@ -89,6 +97,7 @@ type CheckoutDetails struct {
 	Note           string
 	ShippingMethod string
 	PaymentMethod  string
+	CouponCode     string
 }
 
 type CheckoutItem struct {

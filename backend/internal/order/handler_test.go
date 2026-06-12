@@ -132,6 +132,27 @@ func TestHandlerCheckout_EmptyCart(t *testing.T) {
 	assertOrderErrorResponse(t, w, http.StatusBadRequest, "cart is empty")
 }
 
+func TestHandlerCheckout_InvalidCoupon(t *testing.T) {
+	router := newOrderTestRouter(&fakeOrderRepository{createOrderErr: errs.ErrCouponNotFound})
+
+	body := bytes.NewBufferString(`{
+		"recipient_name":"Nguyen Van A",
+		"phone":"0901234567",
+		"address_line":"123 Nguyen Trai",
+		"city":"Ho Chi Minh City",
+		"district":"District 1",
+		"shipping_method":"standard",
+		"payment_method":"cod",
+		"coupon_code":"MISSING"
+	}`)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders", body)
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusNotFound, "coupon not found")
+}
+
 func TestHandlerCheckout_PropagatesRequestDeadlineToRepository(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := &fakeOrderRepository{}

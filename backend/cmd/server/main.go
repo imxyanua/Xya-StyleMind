@@ -16,6 +16,7 @@ import (
 	"stylemind/internal/cart"
 	"stylemind/internal/category"
 	"stylemind/internal/config"
+	"stylemind/internal/coupon"
 	"stylemind/internal/dashboard"
 	"stylemind/internal/database"
 	"stylemind/internal/health"
@@ -153,6 +154,10 @@ func main() {
 	cartRepo := cart.NewRepository(db)
 	cartService := cart.NewService(cartRepo)
 	cart.RegisterRoutes(api, jwtAuth, cartService)
+
+	couponRepo := coupon.NewRepository(db)
+	couponService := coupon.NewService(couponRepo)
+	coupon.RegisterRoutes(api, admin, jwtAuth, couponService, auditService)
 
 	wishlistRepo := wishlist.NewRepository(db)
 	wishlistService := wishlist.NewService(wishlistRepo)

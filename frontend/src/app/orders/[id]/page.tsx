@@ -402,8 +402,14 @@ export default function OrderDetailPage() {
               <div className="grid gap-3 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>{formatVND(subtotal)}</span>
+                  <span>{formatVND(order.subtotal_amount || subtotal)}</span>
                 </div>
+                {order.discount_amount && order.discount_amount > 0 ? (
+                  <div className="flex items-center justify-between text-primary">
+                    <span>Coupon {order.coupon_code}</span>
+                    <span>-{formatVND(order.discount_amount)}</span>
+                  </div>
+                ) : null}
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Shipping</span>
                   <span>{shippingLabel(order.shipping_method)}</span>

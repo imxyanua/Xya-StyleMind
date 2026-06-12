@@ -653,6 +653,11 @@ export default function AdminOrdersPage() {
                   <p className="mt-2 font-heading text-2xl font-semibold">
                     {formatVND(selectedOrder.total_amount)}
                   </p>
+                  {selectedOrder.discount_amount && selectedOrder.discount_amount > 0 ? (
+                    <p className="mt-1 text-xs text-primary">
+                      Coupon {selectedOrder.coupon_code}: -{formatVND(selectedOrder.discount_amount)}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="rounded-2xl border border-border bg-card/70 p-4">

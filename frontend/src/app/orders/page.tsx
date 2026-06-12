@@ -212,10 +212,15 @@ export default function OrdersPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between rounded-2xl bg-muted/60 p-4">
-                <span className="text-sm text-muted-foreground">Order total</span>
-                <span className="font-heading text-2xl font-semibold">
-                  {formatVND(order.total_amount)}
-                </span>
+                <div>
+                  <span className="text-sm text-muted-foreground">Order total</span>
+                  {order.discount_amount && order.discount_amount > 0 ? (
+                    <p className="mt-1 text-xs text-primary">
+                      Coupon {order.coupon_code}: -{formatVND(order.discount_amount)}
+                    </p>
+                  ) : null}
+                </div>
+                <span className="font-heading text-2xl font-semibold">{formatVND(order.total_amount)}</span>
               </div>
               <div className="grid gap-3 rounded-2xl border border-border bg-card/70 p-4 text-sm md:grid-cols-2">
                 <div>

@@ -151,6 +151,28 @@ func TestReturnRequestsMigrationHasConstraints(t *testing.T) {
 	}
 }
 
+func TestCouponsMigrationHasConstraints(t *testing.T) {
+	sql := readMigrationForTest(t, "0012_create_coupons.sql")
+
+	required := []string{
+		"CREATE TABLE IF NOT EXISTS coupons",
+		"CHECK (type IN ('percent', 'fixed'))",
+		"CHECK (type <> 'percent' OR value <= 100)",
+		"CREATE UNIQUE INDEX IF NOT EXISTS idx_coupons_code_lower",
+		"ADD COLUMN IF NOT EXISTS subtotal_amount",
+		"ADD COLUMN IF NOT EXISTS discount_amount",
+		"ADD COLUMN IF NOT EXISTS coupon_id UUID REFERENCES coupons(id) ON DELETE SET NULL",
+		"ADD COLUMN IF NOT EXISTS coupon_code",
+		"CREATE INDEX IF NOT EXISTS idx_orders_coupon_id",
+	}
+
+	for _, text := range required {
+		if !strings.Contains(sql, text) {
+			t.Fatalf("coupons migration missing %q", text)
+		}
+	}
+}
+
 func migrationFilesForTest(t *testing.T) []string {
 	t.Helper()
 

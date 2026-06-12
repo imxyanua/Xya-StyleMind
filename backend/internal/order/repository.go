@@ -2,10 +2,13 @@ package order
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
+	"stylemind/internal/coupon"
 	"stylemind/internal/errs"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -73,22 +76,50 @@ func (r *Repository) CreateOrderFromCart(ctx context.Context, userID, cartID str
 		return "", errs.ErrCartEmpty
 	}
 
-	total := 0.0
+	subtotal := 0.0
 	for _, item := range items {
 		if item.Quantity > item.Stock {
 			return "", errs.ErrInsufficientStock
 		}
-		total += item.Price * float64(item.Quantity)
+		subtotal += item.Price * float64(item.Quantity)
 	}
+
+	discountAmount := 0.0
+	couponID := sql.NullString{}
+	couponCode := sql.NullString{}
+	if details.CouponCode != "" {
+		appliedCoupon, err := r.lockCouponByCode(ctx, tx, details.CouponCode)
+		if err != nil {
+			return "", err
+		}
+		if err := coupon.ValidateForSubtotal(*appliedCoupon, subtotal, time.Now()); err != nil {
+			return "", err
+		}
+		discountAmount = coupon.CalculateDiscount(subtotal, *appliedCoupon)
+		tag, err := tx.Exec(ctx, `
+			UPDATE coupons
+			SET used_count = used_count + 1, updated_at = NOW()
+			WHERE id = $1 AND (usage_limit IS NULL OR used_count < usage_limit)
+		`, appliedCoupon.ID)
+		if err != nil {
+			return "", err
+		}
+		if tag.RowsAffected() == 0 {
+			return "", errs.ErrCouponUsageLimitReached
+		}
+		couponID = sql.NullString{String: appliedCoupon.ID, Valid: true}
+		couponCode = sql.NullString{String: appliedCoupon.Code, Valid: true}
+	}
+	total := subtotal - discountAmount
 
 	orderID := uuid.NewString()
 	_, err = tx.Exec(ctx, `
 		INSERT INTO orders (
-			id, user_id, status, payment_status, total_amount,
+			id, user_id, status, payment_status, subtotal_amount, discount_amount, coupon_id, coupon_code, total_amount,
 			recipient_name, phone, address_line, city, district, note, shipping_method, payment_method
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-	`, orderID, userID, StatusPending, InitialPaymentStatus(details.PaymentMethod), total,
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+	`, orderID, userID, StatusPending, InitialPaymentStatus(details.PaymentMethod), subtotal, discountAmount, couponID, couponCode, total,
 		details.RecipientName, details.Phone, details.AddressLine, details.City, details.District, details.Note, details.ShippingMethod, details.PaymentMethod)
 	if err != nil {
 		return "", err
@@ -128,6 +159,27 @@ func (r *Repository) CreateOrderFromCart(ctx context.Context, userID, cartID str
 	return orderID, nil
 }
 
+func (r *Repository) lockCouponByCode(ctx context.Context, tx pgx.Tx, code string) (*coupon.Coupon, error) {
+	c := &coupon.Coupon{}
+	err := tx.QueryRow(ctx, `
+		SELECT id, code, type, value, min_order_amount, max_discount_amount, usage_limit,
+		       used_count, starts_at, expires_at, is_active, created_at, updated_at
+		FROM coupons
+		WHERE LOWER(code) = LOWER($1)
+		FOR UPDATE
+	`, code).Scan(
+		&c.ID, &c.Code, &c.Type, &c.Value, &c.MinOrderAmount, &c.MaxDiscountAmount, &c.UsageLimit,
+		&c.UsedCount, &c.StartsAt, &c.ExpiresAt, &c.IsActive, &c.CreatedAt, &c.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errs.ErrCouponNotFound
+		}
+		return nil, err
+	}
+	return c, nil
+}
+
 func (r *Repository) ListOrdersByUser(ctx context.Context, userID string, limit, offset int) ([]OrderResponse, int64, error) {
 	var total int64
 	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM orders WHERE user_id = $1`, userID).Scan(&total); err != nil {
@@ -135,7 +187,8 @@ func (r *Repository) ListOrdersByUser(ctx context.Context, userID string, limit,
 	}
 
 	rows, err := r.db.Query(ctx, `
-		SELECT id, user_id, status, payment_status, total_amount,
+		SELECT id, user_id, status, payment_status, subtotal_amount, discount_amount,
+		       COALESCE(coupon_id::text, ''), COALESCE(coupon_code, ''), total_amount,
 		       COALESCE(recipient_name, ''), COALESCE(phone, ''), COALESCE(address_line, ''),
 		       COALESCE(city, ''), COALESCE(district, ''), COALESCE(note, ''),
 		       COALESCE(shipping_method, ''), COALESCE(payment_method, ''),
@@ -196,7 +249,8 @@ func (r *Repository) ListOrders(ctx context.Context, filter AdminOrderFilter, li
 	offsetPlaceholder := fmt.Sprintf("$%d", len(args)+2)
 	queryArgs := append(append([]any{}, args...), limit, offset)
 	query := `
-		SELECT o.id, o.user_id, u.email, u.full_name, u.role, o.status, o.payment_status, o.total_amount,
+		SELECT o.id, o.user_id, u.email, u.full_name, u.role, o.status, o.payment_status,
+		       o.subtotal_amount, o.discount_amount, COALESCE(o.coupon_id::text, ''), COALESCE(o.coupon_code, ''), o.total_amount,
 		       COALESCE(o.recipient_name, ''), COALESCE(o.phone, ''), COALESCE(o.address_line, ''),
 		       COALESCE(o.city, ''), COALESCE(o.district, ''), COALESCE(o.note, ''),
 		       COALESCE(o.shipping_method, ''), COALESCE(o.payment_method, ''),
@@ -219,7 +273,7 @@ func (r *Repository) ListOrders(ctx context.Context, filter AdminOrderFilter, li
 		var user OrderUser
 		if err := rows.Scan(
 			&o.ID, &o.UserID, &user.Email, &user.FullName, &user.Role,
-			&o.Status, &o.PaymentStatus, &o.TotalAmount,
+			&o.Status, &o.PaymentStatus, &o.SubtotalAmount, &o.DiscountAmount, &o.CouponID, &o.CouponCode, &o.TotalAmount,
 			&o.RecipientName, &o.Phone, &o.AddressLine, &o.City, &o.District, &o.Note, &o.ShippingMethod, &o.PaymentMethod,
 			&o.CreatedAt, &o.UpdatedAt,
 		); err != nil {
@@ -253,7 +307,8 @@ func (r *Repository) ListOrders(ctx context.Context, filter AdminOrderFilter, li
 func (r *Repository) GetOrderByIDForUser(ctx context.Context, orderID, userID string) (*OrderResponse, error) {
 	o := &OrderResponse{}
 	err := r.db.QueryRow(ctx, `
-		SELECT id, user_id, status, payment_status, total_amount,
+		SELECT id, user_id, status, payment_status, subtotal_amount, discount_amount,
+		       COALESCE(coupon_id::text, ''), COALESCE(coupon_code, ''), total_amount,
 		       COALESCE(recipient_name, ''), COALESCE(phone, ''), COALESCE(address_line, ''),
 		       COALESCE(city, ''), COALESCE(district, ''), COALESCE(note, ''),
 		       COALESCE(shipping_method, ''), COALESCE(payment_method, ''),
@@ -261,7 +316,7 @@ func (r *Repository) GetOrderByIDForUser(ctx context.Context, orderID, userID st
 		FROM orders
 		WHERE id = $1 AND user_id = $2
 	`, orderID, userID).Scan(
-		&o.ID, &o.UserID, &o.Status, &o.PaymentStatus, &o.TotalAmount,
+		&o.ID, &o.UserID, &o.Status, &o.PaymentStatus, &o.SubtotalAmount, &o.DiscountAmount, &o.CouponID, &o.CouponCode, &o.TotalAmount,
 		&o.RecipientName, &o.Phone, &o.AddressLine, &o.City, &o.District, &o.Note, &o.ShippingMethod, &o.PaymentMethod,
 		&o.CreatedAt, &o.UpdatedAt,
 	)
@@ -283,7 +338,8 @@ func (r *Repository) GetOrderByID(ctx context.Context, orderID string) (*OrderRe
 	o := &OrderResponse{}
 	var user OrderUser
 	err := r.db.QueryRow(ctx, `
-		SELECT o.id, o.user_id, u.email, u.full_name, u.role, o.status, o.payment_status, o.total_amount,
+		SELECT o.id, o.user_id, u.email, u.full_name, u.role, o.status, o.payment_status,
+		       o.subtotal_amount, o.discount_amount, COALESCE(o.coupon_id::text, ''), COALESCE(o.coupon_code, ''), o.total_amount,
 		       COALESCE(o.recipient_name, ''), COALESCE(o.phone, ''), COALESCE(o.address_line, ''),
 		       COALESCE(o.city, ''), COALESCE(o.district, ''), COALESCE(o.note, ''),
 		       COALESCE(o.shipping_method, ''), COALESCE(o.payment_method, ''),
@@ -293,7 +349,7 @@ func (r *Repository) GetOrderByID(ctx context.Context, orderID string) (*OrderRe
 		WHERE o.id = $1
 	`, orderID).Scan(
 		&o.ID, &o.UserID, &user.Email, &user.FullName, &user.Role,
-		&o.Status, &o.PaymentStatus, &o.TotalAmount,
+		&o.Status, &o.PaymentStatus, &o.SubtotalAmount, &o.DiscountAmount, &o.CouponID, &o.CouponCode, &o.TotalAmount,
 		&o.RecipientName, &o.Phone, &o.AddressLine, &o.City, &o.District, &o.Note, &o.ShippingMethod, &o.PaymentMethod,
 		&o.CreatedAt, &o.UpdatedAt,
 	)
@@ -401,7 +457,7 @@ func (r *Repository) GetPaymentStatus(ctx context.Context, orderID string) (stri
 
 func scanOrderResponse(rows pgx.Rows, o *OrderResponse) error {
 	return rows.Scan(
-		&o.ID, &o.UserID, &o.Status, &o.PaymentStatus, &o.TotalAmount,
+		&o.ID, &o.UserID, &o.Status, &o.PaymentStatus, &o.SubtotalAmount, &o.DiscountAmount, &o.CouponID, &o.CouponCode, &o.TotalAmount,
 		&o.RecipientName, &o.Phone, &o.AddressLine, &o.City, &o.District, &o.Note, &o.ShippingMethod, &o.PaymentMethod,
 		&o.CreatedAt, &o.UpdatedAt,
 	)

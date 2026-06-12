@@ -176,6 +176,21 @@ func TestServiceCheckout_Success(t *testing.T) {
 	}
 }
 
+func TestServiceCheckout_NormalizesCouponCode(t *testing.T) {
+	repo := &fakeOrderRepository{}
+	service := NewService(repo)
+	details := validCheckoutDetails()
+	details.CouponCode = " save20 "
+
+	_, err := service.Checkout(context.Background(), "user-1", details)
+	if err != nil {
+		t.Fatalf("Checkout error = %v", err)
+	}
+	if repo.lastCheckoutDetails.CouponCode != "SAVE20" {
+		t.Fatalf("coupon code = %q, want SAVE20", repo.lastCheckoutDetails.CouponCode)
+	}
+}
+
 func TestServiceCheckout_EmptyCart(t *testing.T) {
 	repo := &fakeOrderRepository{createOrderErr: errs.ErrCartEmpty}
 	service := NewService(repo)
@@ -183,6 +198,18 @@ func TestServiceCheckout_EmptyCart(t *testing.T) {
 	_, err := service.Checkout(context.Background(), "user-1", validCheckoutDetails())
 	if !errors.Is(err, errs.ErrCartEmpty) {
 		t.Fatalf("err = %v, want ErrCartEmpty", err)
+	}
+}
+
+func TestServiceCheckout_PropagatesCouponValidationError(t *testing.T) {
+	repo := &fakeOrderRepository{createOrderErr: errs.ErrCouponUsageLimitReached}
+	service := NewService(repo)
+	details := validCheckoutDetails()
+	details.CouponCode = "LIMITED"
+
+	_, err := service.Checkout(context.Background(), "user-1", details)
+	if !errors.Is(err, errs.ErrCouponUsageLimitReached) {
+		t.Fatalf("err = %v, want ErrCouponUsageLimitReached", err)
 	}
 }
 

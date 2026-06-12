@@ -35,6 +35,10 @@ export type Order = Omit<GeneratedOrder, "items" | "user"> & {
   user?: OrderUser;
   status: "pending" | "paid" | "shipping" | "completed" | "cancelled";
   payment_status: "unpaid" | "pending" | "paid" | "failed" | "refunded";
+  subtotal_amount?: number;
+  discount_amount?: number;
+  coupon_id?: string;
+  coupon_code?: string;
   total_amount: number;
   items: OrderItem[];
   created_at: string;

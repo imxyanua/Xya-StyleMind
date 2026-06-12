@@ -9,6 +9,7 @@ import { MapPin, ShieldCheck, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  applyCouponToCart,
   checkoutOrder,
   fetchCart,
   fetchMyAddresses,
@@ -21,6 +22,7 @@ import { getToken } from "@/lib/auth";
 import { PRODUCT_IMAGE_BLUR } from "@/lib/images";
 import { ApiError } from "@/types/api";
 import type { Cart } from "@/types/cart";
+import type { ApplyCouponResult } from "@/types/coupon";
 
 function formatVND(value: number) {
   return new Intl.NumberFormat("vi-VN", {
@@ -52,6 +54,10 @@ export default function CartPage() {
   const [addressesLoading, setAddressesLoading] = useState(false);
   const [addressError, setAddressError] = useState<string | null>(null);
   const [selectedAddressId, setSelectedAddressId] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [couponPreview, setCouponPreview] = useState<ApplyCouponResult | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
   const [checkoutForm, setCheckoutForm] = useState<CheckoutInput>({
     recipient_name: "",
     phone: "",
@@ -138,6 +144,13 @@ export default function CartPage() {
   }, [router]);
 
   const isEmpty = useMemo(() => !cart || cart.items.length === 0, [cart]);
+  const payableTotal = couponPreview?.total_amount ?? cart?.total ?? 0;
+
+  function clearCouponPreview() {
+    setCouponPreview(null);
+    setCouponError(null);
+    setCheckoutForm((current) => ({ ...current, coupon_code: undefined }));
+  }
 
   async function onUpdateItem(itemId: string) {
     const quantity = quantityInputs[itemId];
@@ -151,6 +164,7 @@ export default function CartPage() {
     try {
       const res = await updateCartItem(itemId, quantity);
       setCart(res.data ?? null);
+      clearCouponPreview();
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         router.replace("/login?redirect=/cart");
@@ -168,6 +182,7 @@ export default function CartPage() {
     try {
       const res = await removeCartItem(itemId);
       setCart(res.data ?? null);
+      clearCouponPreview();
       setQuantityInputs((prev) => {
         const copy = { ...prev };
         delete copy[itemId];
@@ -181,6 +196,32 @@ export default function CartPage() {
       setError(err instanceof Error ? err.message : "Failed to remove cart item");
     } finally {
       setItemBusyId(null);
+    }
+  }
+
+  async function onApplyCoupon() {
+    const normalizedCode = couponCode.trim().toUpperCase();
+    if (!normalizedCode) {
+      setCouponError("Enter a coupon code first.");
+      return;
+    }
+
+    setCouponLoading(true);
+    setCouponError(null);
+    try {
+      const response = await applyCouponToCart({ code: normalizedCode });
+      const preview = response.data ?? null;
+      setCouponPreview(preview);
+      setCheckoutForm((current) => ({
+        ...current,
+        coupon_code: preview?.coupon_code ?? normalizedCode,
+      }));
+    } catch (err) {
+      setCouponPreview(null);
+      setCheckoutForm((current) => ({ ...current, coupon_code: undefined }));
+      setCouponError(err instanceof Error ? err.message : "Coupon could not be applied");
+    } finally {
+      setCouponLoading(false);
     }
   }
 
@@ -517,17 +558,53 @@ export default function CartPage() {
                 </p>
               </div>
               <div className="grid gap-2 rounded-2xl border border-border bg-card/70 p-4 text-sm">
+                <div className="space-y-2">
+                  <label htmlFor="coupon_code" className="text-xs font-medium text-muted-foreground">
+                    Coupon code
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="coupon_code"
+                      value={couponCode}
+                      onChange={(event) => setCouponCode(event.target.value.toUpperCase())}
+                      className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-card px-3 text-sm uppercase outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                      placeholder="SAVE20"
+                    />
+                    <Button type="button" variant="outline" onClick={onApplyCoupon} disabled={couponLoading}>
+                      {couponLoading ? "Checking..." : "Apply"}
+                    </Button>
+                  </div>
+                  {couponPreview ? (
+                    <p className="text-xs text-primary">
+                      {couponPreview.coupon_code} applied. Discount {formatVND(couponPreview.discount_amount)}.
+                    </p>
+                  ) : null}
+                  {couponError ? <p className="text-xs text-destructive">{couponError}</p> : null}
+                </div>
+              </div>
+
+              <div className="grid gap-2 rounded-2xl border border-border bg-card/70 p-4 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Items</span>
                   <span>{cart?.items.length ?? 0}</span>
                 </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>{formatVND(couponPreview?.subtotal_amount ?? cart?.total ?? 0)}</span>
+                </div>
+                {couponPreview ? (
+                  <div className="flex items-center justify-between text-primary">
+                    <span>Coupon {couponPreview.coupon_code}</span>
+                    <span>-{formatVND(couponPreview.discount_amount)}</span>
+                  </div>
+                ) : null}
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Shipping</span>
                   <span>Calculated later</span>
                 </div>
                 <div className="flex items-center justify-between border-t border-border pt-3">
                   <span className="font-medium">Total</span>
-                  <span className="font-heading text-2xl font-semibold">{formatVND(cart?.total ?? 0)}</span>
+                  <span className="font-heading text-2xl font-semibold">{formatVND(payableTotal)}</span>
                 </div>
               </div>
               <div className="grid gap-2 text-xs text-muted-foreground">
@@ -541,7 +618,7 @@ export default function CartPage() {
               <div className="flex items-center justify-between rounded-2xl bg-primary p-4 text-primary-foreground">
                 <span className="text-sm opacity-80">Payable now</span>
                 <span className="font-heading text-2xl font-semibold">
-                  {formatVND(cart?.total ?? 0)}
+                  {formatVND(payableTotal)}
                 </span>
               </div>
               <Button form="checkout-form" type="submit" className="w-full" disabled={checkoutLoading || isEmpty}>

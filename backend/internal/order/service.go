@@ -55,6 +55,7 @@ func normalizeCheckoutDetails(details CheckoutDetails) (CheckoutDetails, error) 
 	details.Note = strings.TrimSpace(details.Note)
 	details.ShippingMethod = strings.TrimSpace(details.ShippingMethod)
 	details.PaymentMethod = strings.TrimSpace(details.PaymentMethod)
+	details.CouponCode = strings.ToUpper(strings.TrimSpace(details.CouponCode))
 
 	if details.RecipientName == "" ||
 		details.Phone == "" ||
@@ -77,6 +78,9 @@ func normalizeCheckoutDetails(details CheckoutDetails) (CheckoutDetails, error) 
 		return CheckoutDetails{}, errs.ErrValidationFailed
 	}
 	if details.PaymentMethod != "cod" && details.PaymentMethod != "demo_payment" {
+		return CheckoutDetails{}, errs.ErrValidationFailed
+	}
+	if len(details.CouponCode) > 64 {
 		return CheckoutDetails{}, errs.ErrValidationFailed
 	}
 	return details, nil

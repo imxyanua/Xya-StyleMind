@@ -34,6 +34,12 @@ export default function AdminLayout({
                 Products
               </Link>
               <Link
+                href="/admin/coupons"
+                className="rounded-full border border-border bg-card px-4 py-2 font-medium hover:bg-muted"
+              >
+                Coupons
+              </Link>
+              <Link
                 href="/admin/orders"
                 className="rounded-full border border-border bg-card px-4 py-2 font-medium hover:bg-muted"
               >

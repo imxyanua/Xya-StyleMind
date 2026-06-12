@@ -62,6 +62,7 @@ func (h *Handler) Checkout(c *gin.Context) {
 		Note:           req.Note,
 		ShippingMethod: req.ShippingMethod,
 		PaymentMethod:  req.PaymentMethod,
+		CouponCode:     req.CouponCode,
 	})
 	if err != nil {
 		switch {
@@ -71,6 +72,18 @@ func (h *Handler) Checkout(c *gin.Context) {
 			response.Error(c, http.StatusBadRequest, "cart is empty")
 		case errors.Is(err, errs.ErrInsufficientStock):
 			response.Error(c, http.StatusBadRequest, "insufficient stock")
+		case errors.Is(err, errs.ErrCouponNotFound):
+			response.Error(c, http.StatusNotFound, "coupon not found")
+		case errors.Is(err, errs.ErrCouponInactive):
+			response.Error(c, http.StatusBadRequest, "coupon is inactive")
+		case errors.Is(err, errs.ErrCouponExpired):
+			response.Error(c, http.StatusBadRequest, "coupon is expired")
+		case errors.Is(err, errs.ErrCouponUsageLimitReached):
+			response.Error(c, http.StatusBadRequest, "coupon usage limit reached")
+		case errors.Is(err, errs.ErrCouponMinOrderNotMet):
+			response.Error(c, http.StatusBadRequest, "minimum order amount not met")
+		case errors.Is(err, errs.ErrInvalidCoupon):
+			response.Error(c, http.StatusBadRequest, "invalid coupon")
 		default:
 			response.Error(c, http.StatusInternalServerError, "checkout failed")
 		}

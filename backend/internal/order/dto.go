@@ -9,6 +9,7 @@ type CheckoutRequest struct {
 	Note           string `json:"note" validate:"omitempty,max=1000"`
 	ShippingMethod string `json:"shipping_method" validate:"required,oneof=standard express"`
 	PaymentMethod  string `json:"payment_method" validate:"required,oneof=cod demo_payment"`
+	CouponCode     string `json:"coupon_code" validate:"omitempty,min=2,max=64"`
 }
 
 type UpdateStatusRequest struct {

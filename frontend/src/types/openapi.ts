@@ -202,6 +202,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cart/apply-coupon": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview coupon discount for current cart
+         * @description Validates a coupon against the authenticated user's current cart. Checkout validates the coupon again inside the order transaction.
+         */
+        post: operations["applyCouponToCart"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cart/items": {
         parameters: {
             query?: never;
@@ -430,6 +450,58 @@ export interface paths {
          * @description Admin only. Approving a return request attempts to set the linked order payment_status to refunded.
          */
         patch: operations["updateReturnRequestStatus"];
+        trace?: never;
+    };
+    "/api/v1/admin/coupons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List coupons
+         * @description Admin only.
+         */
+        get: operations["listAdminCoupons"];
+        put?: never;
+        /**
+         * Create coupon
+         * @description Admin only.
+         */
+        post: operations["createCoupon"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/coupons/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get coupon
+         * @description Admin only.
+         */
+        get: operations["getCoupon"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete coupon
+         * @description Admin only. Existing orders keep coupon_code and discount snapshot.
+         */
+        delete: operations["deleteCoupon"];
+        options?: never;
+        head?: never;
+        /**
+         * Update coupon
+         * @description Admin only.
+         */
+        patch: operations["updateCoupon"];
         trace?: never;
     };
     "/api/v1/admin/users": {
@@ -1116,6 +1188,76 @@ export interface components {
             message?: string;
             data?: components["schemas"]["Cart"];
         };
+        ApplyCouponRequest: {
+            /** @example SAVE20 */
+            code: string;
+        };
+        ApplyCouponResult: {
+            /** Format: uuid */
+            coupon_id?: string;
+            /** @example SAVE20 */
+            coupon_code?: string;
+            /** @enum {string} */
+            type?: "percent" | "fixed";
+            value?: number;
+            subtotal_amount?: number;
+            discount_amount?: number;
+            total_amount?: number;
+        };
+        ApplyCouponResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["ApplyCouponResult"];
+        };
+        Coupon: {
+            /** Format: uuid */
+            id?: string;
+            /** @example SAVE20 */
+            code?: string;
+            /** @enum {string} */
+            type?: "percent" | "fixed";
+            value?: number;
+            min_order_amount?: number;
+            max_discount_amount?: number | null;
+            usage_limit?: number | null;
+            used_count?: number;
+            /** Format: date-time */
+            starts_at?: string | null;
+            /** Format: date-time */
+            expires_at?: string | null;
+            is_active?: boolean;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        CouponMutationRequest: {
+            code: string;
+            /** @enum {string} */
+            type: "percent" | "fixed";
+            value: number;
+            /** @default 0 */
+            min_order_amount: number;
+            max_discount_amount?: number | null;
+            usage_limit?: number | null;
+            /** Format: date-time */
+            starts_at?: string | null;
+            /** Format: date-time */
+            expires_at?: string | null;
+            /** @default true */
+            is_active: boolean;
+        };
+        CouponResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["Coupon"];
+        };
+        CouponListResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["Coupon"][];
+            meta?: components["schemas"]["PaginationMeta"];
+        };
         OrderProduct: {
             /** Format: uuid */
             id?: string;
@@ -1155,6 +1297,11 @@ export interface components {
             status?: "pending" | "paid" | "shipping" | "completed" | "cancelled";
             /** @enum {string} */
             payment_status?: "unpaid" | "pending" | "paid" | "failed" | "refunded";
+            subtotal_amount?: number;
+            discount_amount?: number;
+            /** Format: uuid */
+            coupon_id?: string;
+            coupon_code?: string;
             total_amount?: number;
             recipient_name?: string;
             phone?: string;
@@ -1183,6 +1330,7 @@ export interface components {
             shipping_method: "standard" | "express";
             /** @enum {string} */
             payment_method: "cod" | "demo_payment";
+            coupon_code?: string;
         };
         UpdateOrderStatusRequest: {
             /** @enum {string} */
@@ -1930,6 +2078,35 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
+    applyCouponToCart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyCouponRequest"];
+            };
+        };
+        responses: {
+            /** @description Coupon preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyCouponResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     addCartItem: {
         parameters: {
             query?: never;
@@ -2354,6 +2531,159 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listAdminCoupons: {
+        parameters: {
+            query?: {
+                /** @example 1 */
+                page?: components["parameters"]["PageParam"];
+                /** @example 20 */
+                limit?: components["parameters"]["LimitParam"];
+                q?: string;
+                type?: "percent" | "fixed";
+                is_active?: boolean;
+                sort?: "newest" | "oldest";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Coupon list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CouponListResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createCoupon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CouponMutationRequest"];
+            };
+        };
+        responses: {
+            /** @description Coupon created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CouponResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getCoupon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Coupon detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CouponResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    deleteCoupon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Coupon deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NullableSuccessEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateCoupon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CouponMutationRequest"];
+            };
+        };
+        responses: {
+            /** @description Coupon updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CouponResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
         };
