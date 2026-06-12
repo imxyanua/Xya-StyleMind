@@ -19,6 +19,7 @@ type OrderRepository interface {
 	ListOrdersByUser(ctx context.Context, userID string, limit, offset int) ([]OrderResponse, int64, error)
 	ListOrders(ctx context.Context, filter AdminOrderFilter, limit, offset int) ([]OrderResponse, int64, error)
 	UpdateOrderStatus(ctx context.Context, orderID, status string, allowedCurrentStatuses []string) error
+	UpdatePaymentStatus(ctx context.Context, orderID, paymentStatus string, allowedCurrentStatuses []string) error
 	GetOrderByID(ctx context.Context, orderID string) (*OrderResponse, error)
 }
 
@@ -125,6 +126,19 @@ func (s *Service) UpdateStatus(ctx context.Context, orderID, status string) (*Or
 		return nil, errs.ErrInvalidOrderStatus
 	}
 	if err := s.repo.UpdateOrderStatus(ctx, orderID, status, AllowedCurrentStatuses(status)); err != nil {
+		return nil, err
+	}
+	return s.repo.GetOrderByID(ctx, orderID)
+}
+
+func (s *Service) UpdatePaymentStatus(ctx context.Context, orderID, paymentStatus string) (*OrderResponse, error) {
+	if _, err := uuid.Parse(orderID); err != nil {
+		return nil, errs.ErrInvalidID
+	}
+	if !IsValidPaymentStatus(paymentStatus) {
+		return nil, errs.ErrInvalidPaymentStatus
+	}
+	if err := s.repo.UpdatePaymentStatus(ctx, orderID, paymentStatus, AllowedCurrentPaymentStatuses(paymentStatus)); err != nil {
 		return nil, err
 	}
 	return s.repo.GetOrderByID(ctx, orderID)

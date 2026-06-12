@@ -10,10 +10,19 @@ const (
 	StatusCancelled = "cancelled"
 )
 
+const (
+	PaymentStatusUnpaid   = "unpaid"
+	PaymentStatusPending  = "pending"
+	PaymentStatusPaid     = "paid"
+	PaymentStatusFailed   = "failed"
+	PaymentStatusRefunded = "refunded"
+)
+
 type Order struct {
 	ID             string    `json:"id"`
 	UserID         string    `json:"user_id"`
 	Status         string    `json:"status"`
+	PaymentStatus  string    `json:"payment_status"`
 	TotalAmount    float64   `json:"total_amount"`
 	RecipientName  string    `json:"recipient_name,omitempty"`
 	Phone          string    `json:"phone,omitempty"`
@@ -56,6 +65,7 @@ type OrderResponse struct {
 	UserID         string      `json:"user_id"`
 	User           *OrderUser  `json:"user,omitempty"`
 	Status         string      `json:"status"`
+	PaymentStatus  string      `json:"payment_status"`
 	TotalAmount    float64     `json:"total_amount"`
 	RecipientName  string      `json:"recipient_name,omitempty"`
 	Phone          string      `json:"phone,omitempty"`

@@ -332,6 +332,26 @@ export interface paths {
         patch: operations["updateOrderStatus"];
         trace?: never;
     };
+    "/api/v1/admin/orders/{id}/payment-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update order payment status
+         * @description Admin only. Allowed payment statuses are unpaid, pending, paid, failed, refunded.
+         */
+        patch: operations["updateOrderPaymentStatus"];
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -1036,6 +1056,8 @@ export interface components {
             user?: components["schemas"]["OrderUser"];
             /** @enum {string} */
             status?: "pending" | "paid" | "shipping" | "completed" | "cancelled";
+            /** @enum {string} */
+            payment_status?: "unpaid" | "pending" | "paid" | "failed" | "refunded";
             total_amount?: number;
             recipient_name?: string;
             phone?: string;
@@ -1068,6 +1090,10 @@ export interface components {
         UpdateOrderStatusRequest: {
             /** @enum {string} */
             status: "pending" | "paid" | "shipping" | "completed" | "cancelled";
+        };
+        UpdateOrderPaymentStatusRequest: {
+            /** @enum {string} */
+            payment_status: "unpaid" | "pending" | "paid" | "failed" | "refunded";
         };
         OrderResponseEnvelope: {
             success?: boolean;
@@ -1996,6 +2022,38 @@ export interface operations {
         };
         responses: {
             /** @description Order status updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateOrderPaymentStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["OrderIDPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOrderPaymentStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Payment status updated */
             200: {
                 headers: {
                     [name: string]: unknown;

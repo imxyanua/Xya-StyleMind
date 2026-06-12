@@ -63,12 +63,15 @@ func TestOrderCheckoutFlowIntegration(t *testing.T) {
 	}
 
 	service := NewService(NewRepository(db))
-	order, err := service.Checkout(ctx, userID)
+	order, err := service.Checkout(ctx, userID, defaultIntegrationCheckoutDetails())
 	if err != nil {
 		t.Fatalf("Checkout error = %v", err)
 	}
 	if order.Status != StatusPending {
 		t.Fatalf("order.Status = %q, want pending", order.Status)
+	}
+	if order.PaymentStatus != PaymentStatusUnpaid {
+		t.Fatalf("order.PaymentStatus = %q, want unpaid", order.PaymentStatus)
 	}
 	if order.TotalAmount != 200000 {
 		t.Fatalf("order.TotalAmount = %v, want 200000", order.TotalAmount)
@@ -157,7 +160,7 @@ func TestOrderCheckoutRejectsInsufficientStockIntegration(t *testing.T) {
 	})
 
 	service := NewService(NewRepository(db))
-	if _, err := service.Checkout(ctx, userID); !errors.Is(err, errs.ErrInsufficientStock) {
+	if _, err := service.Checkout(ctx, userID, defaultIntegrationCheckoutDetails()); !errors.Is(err, errs.ErrInsufficientStock) {
 		t.Fatalf("Checkout err = %v, want ErrInsufficientStock", err)
 	}
 
@@ -189,7 +192,7 @@ func TestOrderCheckoutRollsBackWhenOrderItemInsertFailsIntegration(t *testing.T)
 	createOrderItemFailureTrigger(ctx, t, db, triggerSuffix, productID)
 
 	service := NewService(NewRepository(db))
-	if _, err := service.Checkout(ctx, userID); err == nil {
+	if _, err := service.Checkout(ctx, userID, defaultIntegrationCheckoutDetails()); err == nil {
 		t.Fatal("Checkout expected forced order_items insert error, got nil")
 	}
 
@@ -249,7 +252,7 @@ func TestConcurrentCheckoutDoesNotMakeStockNegativeIntegration(t *testing.T) {
 		wg.Add(1)
 		go func(userID string) {
 			defer wg.Done()
-			_, err := service.Checkout(ctx, userID)
+			_, err := service.Checkout(ctx, userID, defaultIntegrationCheckoutDetails())
 			errsCh <- err
 		}(userID)
 	}
@@ -452,5 +455,18 @@ func cleanupOrderIntegrationRows(ctx context.Context, t *testing.T, db *pgxpool.
 	}
 	if categoryID != "" {
 		_, _ = db.Exec(ctx, `DELETE FROM categories WHERE id = $1`, categoryID)
+	}
+}
+
+func defaultIntegrationCheckoutDetails() CheckoutDetails {
+	return CheckoutDetails{
+		RecipientName:  "Integration Buyer",
+		Phone:          "0901234567",
+		AddressLine:    "123 Integration Street",
+		City:           "Ho Chi Minh City",
+		District:       "District 1",
+		Note:           "Integration checkout",
+		ShippingMethod: "standard",
+		PaymentMethod:  "cod",
 	}
 }

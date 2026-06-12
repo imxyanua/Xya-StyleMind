@@ -339,6 +339,23 @@ func TestProtectedAdminOrderStatus_UserForbidden(t *testing.T) {
 	assertOrderErrorResponse(t, w, http.StatusForbidden, "forbidden")
 }
 
+func TestProtectedAdminOrderPaymentStatus_UserForbidden(t *testing.T) {
+	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
+
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "user-1", "user")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/orders/"+uuid.NewString()+"/payment-status", bytes.NewBufferString(`{"payment_status":"paid"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusForbidden, "forbidden")
+}
+
 func TestProtectedAdminOrdersList_UserForbidden(t *testing.T) {
 	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
 
@@ -360,6 +377,17 @@ func TestProtectedAdminOrdersList_RequireToken(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/orders", nil)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusUnauthorized, "unauthorized")
+}
+
+func TestProtectedAdminOrderPaymentStatus_RequireToken(t *testing.T) {
+	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/orders/"+uuid.NewString()+"/payment-status", bytes.NewBufferString(`{"payment_status":"paid"}`))
+	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 
 	assertOrderErrorResponse(t, w, http.StatusUnauthorized, "unauthorized")
@@ -545,6 +573,95 @@ func TestProtectedAdminOrderStatus_PatchAllowed(t *testing.T) {
 	}
 	if repo.lastStatus != StatusPaid {
 		t.Fatalf("repo lastStatus = %s, want paid", repo.lastStatus)
+	}
+}
+
+func TestProtectedAdminOrderPaymentStatus_AdminAllowed(t *testing.T) {
+	var audit bytes.Buffer
+	restore := logger.SetAuditOutput(&audit)
+	defer restore()
+
+	repo := &fakeOrderRepository{currentPaymentStatus: PaymentStatusUnpaid}
+	router := newProtectedOrderTestRouter(repo, "test-secret")
+
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	orderID := uuid.NewString()
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/orders/"+orderID+"/payment-status", bytes.NewBufferString(`{"payment_status":"paid"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if repo.lastOrderID != orderID || repo.lastPaymentStatus != PaymentStatusPaid {
+		t.Fatalf("repo update = order:%s payment:%s, want %s/%s", repo.lastOrderID, repo.lastPaymentStatus, orderID, PaymentStatusPaid)
+	}
+	assertOrderAuditEvent(t, audit.String(), map[string]any{
+		"type":               "audit",
+		"event":              "admin.order_payment_status.update",
+		"result":             "success",
+		"user_id":            "admin-1",
+		"role":               "admin",
+		"order_id":           orderID,
+		"old_payment_status": PaymentStatusUnpaid,
+		"new_payment_status": PaymentStatusPaid,
+		"request_id":         "req-order-audit-1",
+	})
+	assertOrderAuditDoesNotContain(t, audit.String(), token, "Authorization", "Bearer")
+}
+
+func TestProtectedAdminOrderPaymentStatus_InvalidStatus(t *testing.T) {
+	router := newProtectedOrderTestRouter(&fakeOrderRepository{}, "test-secret")
+
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/orders/"+uuid.NewString()+"/payment-status", bytes.NewBufferString(`{"payment_status":"captured"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusBadRequest, "invalid payment status")
+}
+
+func TestProtectedAdminOrderPaymentStatusFailed_WritesPersistentAudit(t *testing.T) {
+	repo := &fakeOrderRepository{currentPaymentStatus: PaymentStatusPaid, updatePaymentStatusErr: errs.ErrInvalidPaymentStatusTransition}
+	recorder := &fakeOrderAuditRecorder{}
+	router := newProtectedOrderTestRouterWithRecorder(repo, "test-secret", recorder)
+
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	orderID := uuid.NewString()
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/orders/"+orderID+"/payment-status", bytes.NewBufferString(`{"payment_status":"failed"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	assertOrderErrorResponse(t, w, http.StatusBadRequest, "invalid payment status transition")
+	if len(recorder.events) != 1 {
+		t.Fatalf("audit events = %d, want 1", len(recorder.events))
+	}
+	event := recorder.events[0]
+	if event.action != "admin.order_payment_status.update" || event.resourceType != "order" || event.resourceID != orderID || event.result != "failed" {
+		t.Fatalf("event = %+v", event)
+	}
+	if event.metadata["old_payment_status"] != PaymentStatusPaid ||
+		event.metadata["new_payment_status"] != PaymentStatusFailed ||
+		event.metadata["reason"] != "invalid_status_transition" {
+		t.Fatalf("metadata = %+v", event.metadata)
 	}
 }
 

@@ -14,3 +14,7 @@ type CheckoutRequest struct {
 type UpdateStatusRequest struct {
 	Status string `json:"status" validate:"required,oneof=pending paid shipping completed cancelled"`
 }
+
+type UpdatePaymentStatusRequest struct {
+	PaymentStatus string `json:"payment_status" validate:"required,oneof=unpaid pending paid failed refunded"`
+}

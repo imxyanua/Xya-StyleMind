@@ -33,6 +33,22 @@ function paymentLabel(method?: string) {
   return method === "demo_payment" ? "Demo payment" : method === "cod" ? "COD" : "Not provided";
 }
 
+function paymentStatusLabel(status?: string) {
+  return status ? status.replaceAll("_", " ") : "unknown";
+}
+
+function paymentStatusTone(status?: Order["payment_status"]) {
+  switch (status) {
+    case "paid":
+      return "secondary";
+    case "failed":
+    case "refunded":
+      return "destructive";
+    default:
+      return "outline";
+  }
+}
+
 export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -176,11 +192,14 @@ export default function OrdersPage() {
                 <Badge variant="secondary" className="capitalize">
                   {order.status}
                 </Badge>
+                <Badge variant={paymentStatusTone(order.payment_status)} className="capitalize">
+                  Payment {paymentStatusLabel(order.payment_status)}
+                </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between rounded-2xl bg-muted/60 p-4">
-                <span className="text-sm text-muted-foreground">Total paid</span>
+                <span className="text-sm text-muted-foreground">Order total</span>
                 <span className="font-heading text-2xl font-semibold">
                   {formatVND(order.total_amount)}
                 </span>
@@ -198,6 +217,9 @@ export default function OrdersPage() {
                   <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Fulfillment</p>
                   <p className="mt-2 font-medium">{shippingLabel(order.shipping_method)}</p>
                   <p className="mt-1 text-muted-foreground">Payment: {paymentLabel(order.payment_method)}</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Payment status: {paymentStatusLabel(order.payment_status)}
+                  </p>
                   {order.note ? <p className="mt-1 text-muted-foreground">Note: {order.note}</p> : null}
                 </div>
               </div>

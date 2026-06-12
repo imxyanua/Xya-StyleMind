@@ -38,6 +38,7 @@ func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, authMiddleware
 	admin.GET("/orders/:id", h.GetAdmin)
 	admin.PUT("/orders/:id/status", h.UpdateStatus)
 	admin.PATCH("/orders/:id/status", h.UpdateStatus)
+	admin.PATCH("/orders/:id/payment-status", h.UpdatePaymentStatus)
 }
 
 func (h *Handler) Checkout(c *gin.Context) {
@@ -234,6 +235,85 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 	response.Success(c, http.StatusOK, "order status updated", order)
 }
 
+func (h *Handler) UpdatePaymentStatus(c *gin.Context) {
+	var req UpdatePaymentStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.Audit(c, "admin.order_payment_status.update", logger.AuditResultFailed, map[string]any{
+			"order_id": c.Param("id"),
+			"reason":   "invalid_payload",
+		})
+		h.recordAudit(c, "admin.order_payment_status.update", c.Param("id"), audit.ResultFailed, gin.H{"reason": "invalid_payload"})
+		response.Error(c, http.StatusBadRequest, "invalid payload")
+		return
+	}
+	if err := validator.Validate.Struct(req); err != nil {
+		logger.Audit(c, "admin.order_payment_status.update", logger.AuditResultFailed, map[string]any{
+			"order_id":           c.Param("id"),
+			"new_payment_status": req.PaymentStatus,
+			"reason":             "validation_error",
+		})
+		h.recordAudit(c, "admin.order_payment_status.update", c.Param("id"), audit.ResultFailed, gin.H{"new_payment_status": req.PaymentStatus, "reason": "validation_error"})
+		response.Error(c, http.StatusBadRequest, "invalid payment status")
+		return
+	}
+
+	currentOrder, err := h.service.GetOrder(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		logger.Audit(c, "admin.order_payment_status.update", logger.AuditResultFailed, map[string]any{
+			"order_id":           c.Param("id"),
+			"new_payment_status": req.PaymentStatus,
+			"reason":             safePaymentAuditReason(err),
+		})
+		h.recordAudit(c, "admin.order_payment_status.update", c.Param("id"), audit.ResultFailed, gin.H{"new_payment_status": req.PaymentStatus, "reason": safePaymentAuditReason(err)})
+		if errors.Is(err, errs.ErrInvalidID) {
+			response.Error(c, http.StatusBadRequest, "invalid order id")
+			return
+		}
+		if errors.Is(err, errs.ErrOrderNotFound) {
+			response.Error(c, http.StatusNotFound, "order not found")
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "failed to update payment status")
+		return
+	}
+
+	order, err := h.service.UpdatePaymentStatus(c.Request.Context(), c.Param("id"), req.PaymentStatus)
+	if err != nil {
+		logger.Audit(c, "admin.order_payment_status.update", logger.AuditResultFailed, map[string]any{
+			"order_id":           c.Param("id"),
+			"old_payment_status": currentOrder.PaymentStatus,
+			"new_payment_status": req.PaymentStatus,
+			"reason":             safePaymentAuditReason(err),
+		})
+		h.recordAudit(c, "admin.order_payment_status.update", c.Param("id"), audit.ResultFailed, gin.H{"old_payment_status": currentOrder.PaymentStatus, "new_payment_status": req.PaymentStatus, "reason": safePaymentAuditReason(err)})
+		if errors.Is(err, errs.ErrInvalidID) {
+			response.Error(c, http.StatusBadRequest, "invalid order id")
+			return
+		}
+		if errors.Is(err, errs.ErrOrderNotFound) {
+			response.Error(c, http.StatusNotFound, "order not found")
+			return
+		}
+		if errors.Is(err, errs.ErrInvalidPaymentStatus) {
+			response.Error(c, http.StatusBadRequest, "invalid payment status")
+			return
+		}
+		if errors.Is(err, errs.ErrInvalidPaymentStatusTransition) {
+			response.Error(c, http.StatusBadRequest, "invalid payment status transition")
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "failed to update payment status")
+		return
+	}
+	logger.Audit(c, "admin.order_payment_status.update", logger.AuditResultSuccess, map[string]any{
+		"order_id":           order.ID,
+		"old_payment_status": currentOrder.PaymentStatus,
+		"new_payment_status": order.PaymentStatus,
+	})
+	h.recordAudit(c, "admin.order_payment_status.update", order.ID, audit.ResultSuccess, gin.H{"old_payment_status": currentOrder.PaymentStatus, "new_payment_status": order.PaymentStatus})
+	response.Success(c, http.StatusOK, "payment status updated", order)
+}
+
 func (h *Handler) recordAudit(c *gin.Context, action, resourceID, result string, metadata map[string]any) {
 	if h.audit == nil {
 		return
@@ -250,6 +330,21 @@ func safeOrderAuditReason(err error) string {
 	case errors.Is(err, errs.ErrInvalidOrderStatus):
 		return "validation_error"
 	case errors.Is(err, errs.ErrInvalidOrderStatusTransition):
+		return "invalid_status_transition"
+	default:
+		return "internal_error"
+	}
+}
+
+func safePaymentAuditReason(err error) string {
+	switch {
+	case errors.Is(err, errs.ErrInvalidID):
+		return "validation_error"
+	case errors.Is(err, errs.ErrOrderNotFound):
+		return "not_found"
+	case errors.Is(err, errs.ErrInvalidPaymentStatus):
+		return "validation_error"
+	case errors.Is(err, errs.ErrInvalidPaymentStatusTransition):
 		return "invalid_status_transition"
 	default:
 		return "internal_error"

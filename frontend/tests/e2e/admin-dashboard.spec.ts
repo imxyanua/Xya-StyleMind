@@ -28,6 +28,7 @@ type Product = {
 type Order = {
   id: string;
   status: string;
+  payment_status?: string;
   user?: {
     email?: string;
     full_name?: string;
@@ -406,6 +407,15 @@ test("admin can update order status and sees invalid transition errors", async (
   await expect(page.getByText(order.id)).toBeVisible();
   await expect(page.locator("p").filter({ hasText: /^paid$/ }).first()).toBeVisible();
 
+  await page.getByLabel("Payment status").selectOption("paid");
+  await page.getByRole("button", { name: "Update payment status" }).click();
+  await expect(page.getByText("Payment status updated.")).toBeVisible();
+  await expect(page.getByText("Payment paid").first()).toBeVisible();
+
+  await page.getByLabel("Payment status").selectOption("failed");
+  await page.getByRole("button", { name: "Update payment status" }).click();
+  await expect(page.getByText(/invalid payment status transition/i)).toBeVisible();
+
   await page.getByLabel("Status filter").selectOption("paid");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page.getByText(order.id)).toBeVisible();
@@ -425,4 +435,12 @@ test("admin can update order status and sees invalid transition errors", async (
   await expect(page.getByText("admin.order_status.update").first()).toBeVisible();
   await expect(page.getByText(/\"old_status\": \"pending\"/).first()).toBeVisible();
   await expect(page.getByText(/\"new_status\": \"paid\"/).first()).toBeVisible();
+
+  await page.getByLabel("Action").fill("admin.order_payment_status.update");
+  await page.getByLabel("Resource").selectOption("order");
+  await page.getByLabel("Result").selectOption("success");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(page.getByText("admin.order_payment_status.update").first()).toBeVisible();
+  await expect(page.getByText(/\"old_payment_status\": \"unpaid\"/).first()).toBeVisible();
+  await expect(page.getByText(/\"new_payment_status\": \"paid\"/).first()).toBeVisible();
 });

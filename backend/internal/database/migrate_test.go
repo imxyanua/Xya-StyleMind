@@ -113,6 +113,24 @@ func TestUserAddressesMigrationHasDefaultConstraint(t *testing.T) {
 	}
 }
 
+func TestOrderPaymentStatusMigrationIsIdempotent(t *testing.T) {
+	sql := readMigrationForTest(t, "0010_add_order_payment_status.sql")
+
+	required := []string{
+		"ADD COLUMN IF NOT EXISTS payment_status",
+		"orders_payment_status_check",
+		"status IN ('paid', 'shipping', 'completed') THEN 'paid'",
+		"CREATE INDEX IF NOT EXISTS idx_orders_payment_status",
+		"CREATE INDEX IF NOT EXISTS idx_orders_payment_status_created_at",
+	}
+
+	for _, text := range required {
+		if !strings.Contains(sql, text) {
+			t.Fatalf("payment status migration missing %q", text)
+		}
+	}
+}
+
 func migrationFilesForTest(t *testing.T) []string {
 	t.Helper()
 

@@ -279,6 +279,8 @@ export async function fetchMyOrder(id: string) {
 export type AdminOrderListParams = NonNullable<
   operations["listAdminOrders"]["parameters"]["query"]
 >;
+export type UpdateOrderPaymentStatusInput =
+  components["schemas"]["UpdateOrderPaymentStatusRequest"];
 
 export async function fetchAdminOrders(params: AdminOrderListParams = {}) {
   const searchParams = new URLSearchParams();
@@ -300,6 +302,13 @@ export async function updateOrderStatus(id: string, status: Order["status"]) {
   return apiRequest<Order>(`/admin/orders/${id}/status`, {
     method: "PATCH",
     body: JSON.stringify({ status }),
+  });
+}
+
+export async function updateOrderPaymentStatus(id: string, input: UpdateOrderPaymentStatusInput) {
+  return apiRequest<Order>(`/admin/orders/${id}/payment-status`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
   });
 }
 

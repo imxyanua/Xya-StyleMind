@@ -11,30 +11,35 @@ import (
 )
 
 type fakeOrderRepository struct {
-	cartID                 string
-	orderID                string
-	getOrCreateCartErr     error
-	createOrderErr         error
-	getOrderForUserErr     error
-	getOrderErr            error
-	listOrdersErr          error
-	listAllOrdersErr       error
-	updateStatusErr        error
-	currentStatus          string
-	lastUserID             string
-	lastCartID             string
-	lastCheckoutDetails    CheckoutDetails
-	lastOrderID            string
-	lastStatus             string
-	lastAllowedStatuses    []string
-	lastAdminFilter        AdminOrderFilter
-	listLimit              int
-	listOffset             int
-	listAllLimit           int
-	listAllOffset          int
-	getOrderForUserCalled  bool
-	contextHadDeadline     bool
-	updateOrderStatusCalls int
+	cartID                     string
+	orderID                    string
+	getOrCreateCartErr         error
+	createOrderErr             error
+	getOrderForUserErr         error
+	getOrderErr                error
+	listOrdersErr              error
+	listAllOrdersErr           error
+	updateStatusErr            error
+	updatePaymentStatusErr     error
+	currentStatus              string
+	currentPaymentStatus       string
+	lastUserID                 string
+	lastCartID                 string
+	lastCheckoutDetails        CheckoutDetails
+	lastOrderID                string
+	lastStatus                 string
+	lastPaymentStatus          string
+	lastAllowedStatuses        []string
+	lastAllowedPaymentStatuses []string
+	lastAdminFilter            AdminOrderFilter
+	listLimit                  int
+	listOffset                 int
+	listAllLimit               int
+	listAllOffset              int
+	getOrderForUserCalled      bool
+	contextHadDeadline         bool
+	updateOrderStatusCalls     int
+	updatePaymentStatusCalls   int
 }
 
 func (r *fakeOrderRepository) GetOrCreateCart(ctx context.Context, userID string) (string, error) {
@@ -118,6 +123,14 @@ func (r *fakeOrderRepository) UpdateOrderStatus(_ context.Context, orderID, stat
 	return r.updateStatusErr
 }
 
+func (r *fakeOrderRepository) UpdatePaymentStatus(_ context.Context, orderID, paymentStatus string, allowedCurrentStatuses []string) error {
+	r.updatePaymentStatusCalls++
+	r.lastOrderID = orderID
+	r.lastPaymentStatus = paymentStatus
+	r.lastAllowedPaymentStatuses = append([]string(nil), allowedCurrentStatuses...)
+	return r.updatePaymentStatusErr
+}
+
 func (r *fakeOrderRepository) GetOrderByID(_ context.Context, orderID string) (*OrderResponse, error) {
 	r.lastOrderID = orderID
 	if r.getOrderErr != nil {
@@ -130,7 +143,14 @@ func (r *fakeOrderRepository) GetOrderByID(_ context.Context, orderID string) (*
 	if status == "" {
 		status = StatusPending
 	}
-	return &OrderResponse{ID: orderID, Status: status, Items: []OrderItem{}}, nil
+	paymentStatus := r.lastPaymentStatus
+	if paymentStatus == "" {
+		paymentStatus = r.currentPaymentStatus
+	}
+	if paymentStatus == "" {
+		paymentStatus = PaymentStatusUnpaid
+	}
+	return &OrderResponse{ID: orderID, Status: status, PaymentStatus: paymentStatus, Items: []OrderItem{}}, nil
 }
 
 func TestServiceCheckout_Success(t *testing.T) {
@@ -331,5 +351,59 @@ func TestServiceUpdateStatus_InvalidTransition(t *testing.T) {
 	_, err := service.UpdateStatus(context.Background(), uuid.NewString(), StatusPaid)
 	if !errors.Is(err, errs.ErrInvalidOrderStatusTransition) {
 		t.Fatalf("err = %v, want ErrInvalidOrderStatusTransition", err)
+	}
+}
+
+func TestServiceUpdatePaymentStatus_InvalidID(t *testing.T) {
+	service := NewService(nil)
+
+	_, err := service.UpdatePaymentStatus(context.Background(), "bad-id", PaymentStatusPaid)
+	if !errors.Is(err, errs.ErrInvalidID) {
+		t.Fatalf("err = %v, want ErrInvalidID", err)
+	}
+}
+
+func TestServiceUpdatePaymentStatus_InvalidStatus(t *testing.T) {
+	service := NewService(nil)
+
+	_, err := service.UpdatePaymentStatus(context.Background(), uuid.NewString(), "captured")
+	if !errors.Is(err, errs.ErrInvalidPaymentStatus) {
+		t.Fatalf("err = %v, want ErrInvalidPaymentStatus", err)
+	}
+}
+
+func TestServiceUpdatePaymentStatus_PassesAllowedTransitionsToRepository(t *testing.T) {
+	repo := &fakeOrderRepository{}
+	service := NewService(repo)
+	orderID := uuid.NewString()
+
+	order, err := service.UpdatePaymentStatus(context.Background(), orderID, PaymentStatusPaid)
+	if err != nil {
+		t.Fatalf("UpdatePaymentStatus error = %v", err)
+	}
+	if order.PaymentStatus != PaymentStatusPaid {
+		t.Fatalf("order.PaymentStatus = %q, want %q", order.PaymentStatus, PaymentStatusPaid)
+	}
+	if repo.updatePaymentStatusCalls != 1 {
+		t.Fatalf("update payment calls = %d, want 1", repo.updatePaymentStatusCalls)
+	}
+	want := []string{PaymentStatusUnpaid, PaymentStatusPending, PaymentStatusPaid}
+	if len(repo.lastAllowedPaymentStatuses) != len(want) {
+		t.Fatalf("allowed payment statuses = %+v, want %+v", repo.lastAllowedPaymentStatuses, want)
+	}
+	for i := range want {
+		if repo.lastAllowedPaymentStatuses[i] != want[i] {
+			t.Fatalf("allowed payment statuses = %+v, want %+v", repo.lastAllowedPaymentStatuses, want)
+		}
+	}
+}
+
+func TestServiceUpdatePaymentStatus_InvalidTransition(t *testing.T) {
+	repo := &fakeOrderRepository{updatePaymentStatusErr: errs.ErrInvalidPaymentStatusTransition}
+	service := NewService(repo)
+
+	_, err := service.UpdatePaymentStatus(context.Background(), uuid.NewString(), PaymentStatusRefunded)
+	if !errors.Is(err, errs.ErrInvalidPaymentStatusTransition) {
+		t.Fatalf("err = %v, want ErrInvalidPaymentStatusTransition", err)
 	}
 }

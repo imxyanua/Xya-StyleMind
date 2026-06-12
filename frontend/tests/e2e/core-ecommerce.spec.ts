@@ -28,6 +28,7 @@ type Product = {
 type Order = {
   id: string;
   status: string;
+  payment_status: string;
   items: Array<{ product_id: string }>;
 };
 
@@ -184,6 +185,7 @@ test("core ecommerce flows work against the real backend", async ({ page, reques
   await expect(page.getByText(/77 Saved Address Lane/)).toBeVisible();
   await expect(page.getByText("Express delivery").first()).toBeVisible();
   await expect(page.getByText("Payment: Demo payment")).toBeVisible();
+  await expect(page.getByText("Payment status: pending").first()).toBeVisible();
 
   const token = await authToken(page);
   const ordersResponse = await apiGet<Order[]>(request, "/orders?limit=20", token);
@@ -204,6 +206,7 @@ test("core ecommerce flows work against the real backend", async ({ page, reques
   await expect(page.getByText(/77 Saved Address Lane/)).toBeVisible();
   await expect(page.getByText("Express delivery").first()).toBeVisible();
   await expect(page.getByText("Demo payment").first()).toBeVisible();
+  await expect(page.getByText("Payment status: pending").first()).toBeVisible();
 
   await page.goto(`/orders/${createdOrderId}`);
   await expect(page.getByText("Order progress")).toBeVisible();

@@ -52,6 +52,22 @@ function paymentLabel(method?: string) {
   return method === "demo_payment" ? "Demo payment" : method === "cod" ? "COD" : "Not provided";
 }
 
+function paymentStatusLabel(status?: string) {
+  return status ? status.replaceAll("_", " ") : "unknown";
+}
+
+function paymentStatusTone(status?: Order["payment_status"]) {
+  switch (status) {
+    case "paid":
+      return "secondary";
+    case "failed":
+    case "refunded":
+      return "destructive";
+    default:
+      return "outline";
+  }
+}
+
 function statusLabel(status: string) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
@@ -227,6 +243,9 @@ export default function OrderDetailPage() {
             <Badge variant="outline" className="h-8 px-3 text-sm">
               {paymentLabel(order.payment_method)}
             </Badge>
+            <Badge variant={paymentStatusTone(order.payment_status)} className="h-8 px-3 text-sm capitalize">
+              Payment {paymentStatusLabel(order.payment_status)}
+            </Badge>
           </div>
         </div>
       </section>
@@ -336,6 +355,7 @@ export default function OrderDetailPage() {
               <p className="inline-flex items-center gap-2 font-medium">
                 <CreditCard className="size-4" /> {paymentLabel(order.payment_method)}
               </p>
+              <p className="capitalize">Payment status: {paymentStatusLabel(order.payment_status)}</p>
               <p className="leading-6 text-muted-foreground">
                 No real card or bank credentials are stored for this demo checkout.
               </p>

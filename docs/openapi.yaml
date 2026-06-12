@@ -636,6 +636,45 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/admin/orders/{id}/payment-status:
+    patch:
+      tags: [Orders]
+      summary: Update order payment status
+      description: Admin only. Allowed payment statuses are unpaid, pending, paid, failed, refunded.
+      operationId: updateOrderPaymentStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/OrderIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderPaymentStatusRequest'
+            examples:
+              default:
+                value:
+                  payment_status: paid
+      responses:
+        '200':
+          description: Payment status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/admin/users:
     get:
       tags: [Admin]
@@ -2308,6 +2347,9 @@ components:
         status:
           type: string
           enum: [pending, paid, shipping, completed, cancelled]
+        payment_status:
+          type: string
+          enum: [unpaid, pending, paid, failed, refunded]
         total_amount:
           type: number
         recipient_name:
@@ -2385,6 +2427,13 @@ components:
         status:
           type: string
           enum: [pending, paid, shipping, completed, cancelled]
+    UpdateOrderPaymentStatusRequest:
+      type: object
+      required: [payment_status]
+      properties:
+        payment_status:
+          type: string
+          enum: [unpaid, pending, paid, failed, refunded]
     OrderResponseEnvelope:
       type: object
       properties:

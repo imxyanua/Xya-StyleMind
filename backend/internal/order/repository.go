@@ -84,11 +84,11 @@ func (r *Repository) CreateOrderFromCart(ctx context.Context, userID, cartID str
 	orderID := uuid.NewString()
 	_, err = tx.Exec(ctx, `
 		INSERT INTO orders (
-			id, user_id, status, total_amount,
+			id, user_id, status, payment_status, total_amount,
 			recipient_name, phone, address_line, city, district, note, shipping_method, payment_method
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-	`, orderID, userID, StatusPending, total,
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+	`, orderID, userID, StatusPending, InitialPaymentStatus(details.PaymentMethod), total,
 		details.RecipientName, details.Phone, details.AddressLine, details.City, details.District, details.Note, details.ShippingMethod, details.PaymentMethod)
 	if err != nil {
 		return "", err
@@ -135,7 +135,7 @@ func (r *Repository) ListOrdersByUser(ctx context.Context, userID string, limit,
 	}
 
 	rows, err := r.db.Query(ctx, `
-		SELECT id, user_id, status, total_amount,
+		SELECT id, user_id, status, payment_status, total_amount,
 		       COALESCE(recipient_name, ''), COALESCE(phone, ''), COALESCE(address_line, ''),
 		       COALESCE(city, ''), COALESCE(district, ''), COALESCE(note, ''),
 		       COALESCE(shipping_method, ''), COALESCE(payment_method, ''),
@@ -196,7 +196,7 @@ func (r *Repository) ListOrders(ctx context.Context, filter AdminOrderFilter, li
 	offsetPlaceholder := fmt.Sprintf("$%d", len(args)+2)
 	queryArgs := append(append([]any{}, args...), limit, offset)
 	query := `
-		SELECT o.id, o.user_id, u.email, u.full_name, u.role, o.status, o.total_amount,
+		SELECT o.id, o.user_id, u.email, u.full_name, u.role, o.status, o.payment_status, o.total_amount,
 		       COALESCE(o.recipient_name, ''), COALESCE(o.phone, ''), COALESCE(o.address_line, ''),
 		       COALESCE(o.city, ''), COALESCE(o.district, ''), COALESCE(o.note, ''),
 		       COALESCE(o.shipping_method, ''), COALESCE(o.payment_method, ''),
@@ -219,7 +219,7 @@ func (r *Repository) ListOrders(ctx context.Context, filter AdminOrderFilter, li
 		var user OrderUser
 		if err := rows.Scan(
 			&o.ID, &o.UserID, &user.Email, &user.FullName, &user.Role,
-			&o.Status, &o.TotalAmount,
+			&o.Status, &o.PaymentStatus, &o.TotalAmount,
 			&o.RecipientName, &o.Phone, &o.AddressLine, &o.City, &o.District, &o.Note, &o.ShippingMethod, &o.PaymentMethod,
 			&o.CreatedAt, &o.UpdatedAt,
 		); err != nil {
@@ -253,7 +253,7 @@ func (r *Repository) ListOrders(ctx context.Context, filter AdminOrderFilter, li
 func (r *Repository) GetOrderByIDForUser(ctx context.Context, orderID, userID string) (*OrderResponse, error) {
 	o := &OrderResponse{}
 	err := r.db.QueryRow(ctx, `
-		SELECT id, user_id, status, total_amount,
+		SELECT id, user_id, status, payment_status, total_amount,
 		       COALESCE(recipient_name, ''), COALESCE(phone, ''), COALESCE(address_line, ''),
 		       COALESCE(city, ''), COALESCE(district, ''), COALESCE(note, ''),
 		       COALESCE(shipping_method, ''), COALESCE(payment_method, ''),
@@ -261,7 +261,7 @@ func (r *Repository) GetOrderByIDForUser(ctx context.Context, orderID, userID st
 		FROM orders
 		WHERE id = $1 AND user_id = $2
 	`, orderID, userID).Scan(
-		&o.ID, &o.UserID, &o.Status, &o.TotalAmount,
+		&o.ID, &o.UserID, &o.Status, &o.PaymentStatus, &o.TotalAmount,
 		&o.RecipientName, &o.Phone, &o.AddressLine, &o.City, &o.District, &o.Note, &o.ShippingMethod, &o.PaymentMethod,
 		&o.CreatedAt, &o.UpdatedAt,
 	)
@@ -283,7 +283,7 @@ func (r *Repository) GetOrderByID(ctx context.Context, orderID string) (*OrderRe
 	o := &OrderResponse{}
 	var user OrderUser
 	err := r.db.QueryRow(ctx, `
-		SELECT o.id, o.user_id, u.email, u.full_name, u.role, o.status, o.total_amount,
+		SELECT o.id, o.user_id, u.email, u.full_name, u.role, o.status, o.payment_status, o.total_amount,
 		       COALESCE(o.recipient_name, ''), COALESCE(o.phone, ''), COALESCE(o.address_line, ''),
 		       COALESCE(o.city, ''), COALESCE(o.district, ''), COALESCE(o.note, ''),
 		       COALESCE(o.shipping_method, ''), COALESCE(o.payment_method, ''),
@@ -293,7 +293,7 @@ func (r *Repository) GetOrderByID(ctx context.Context, orderID string) (*OrderRe
 		WHERE o.id = $1
 	`, orderID).Scan(
 		&o.ID, &o.UserID, &user.Email, &user.FullName, &user.Role,
-		&o.Status, &o.TotalAmount,
+		&o.Status, &o.PaymentStatus, &o.TotalAmount,
 		&o.RecipientName, &o.Phone, &o.AddressLine, &o.City, &o.District, &o.Note, &o.ShippingMethod, &o.PaymentMethod,
 		&o.CreatedAt, &o.UpdatedAt,
 	)
@@ -344,6 +344,37 @@ func (r *Repository) UpdateOrderStatus(ctx context.Context, orderID, status stri
 	return nil
 }
 
+func (r *Repository) UpdatePaymentStatus(ctx context.Context, orderID, paymentStatus string, allowedCurrentStatuses []string) error {
+	if len(allowedCurrentStatuses) == 0 {
+		return errs.ErrInvalidPaymentStatus
+	}
+
+	args := []any{orderID, paymentStatus}
+	placeholders := make([]string, len(allowedCurrentStatuses))
+	for i, currentStatus := range allowedCurrentStatuses {
+		placeholders[i] = fmt.Sprintf("$%d", i+3)
+		args = append(args, currentStatus)
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE orders
+		SET payment_status = $2, updated_at = NOW()
+		WHERE id = $1 AND payment_status IN (%s)
+	`, strings.Join(placeholders, ","))
+
+	tag, err := r.db.Exec(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		if _, err := r.GetPaymentStatus(ctx, orderID); err != nil {
+			return err
+		}
+		return errs.ErrInvalidPaymentStatusTransition
+	}
+	return nil
+}
+
 func (r *Repository) GetOrderStatus(ctx context.Context, orderID string) (string, error) {
 	var status string
 	err := r.db.QueryRow(ctx, `SELECT status FROM orders WHERE id = $1`, orderID).Scan(&status)
@@ -356,9 +387,21 @@ func (r *Repository) GetOrderStatus(ctx context.Context, orderID string) (string
 	return status, nil
 }
 
+func (r *Repository) GetPaymentStatus(ctx context.Context, orderID string) (string, error) {
+	var status string
+	err := r.db.QueryRow(ctx, `SELECT payment_status FROM orders WHERE id = $1`, orderID).Scan(&status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", errs.ErrOrderNotFound
+		}
+		return "", err
+	}
+	return status, nil
+}
+
 func scanOrderResponse(rows pgx.Rows, o *OrderResponse) error {
 	return rows.Scan(
-		&o.ID, &o.UserID, &o.Status, &o.TotalAmount,
+		&o.ID, &o.UserID, &o.Status, &o.PaymentStatus, &o.TotalAmount,
 		&o.RecipientName, &o.Phone, &o.AddressLine, &o.City, &o.District, &o.Note, &o.ShippingMethod, &o.PaymentMethod,
 		&o.CreatedAt, &o.UpdatedAt,
 	)

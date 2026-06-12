@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import {
   fetchAdminOrder,
   fetchAdminOrders,
+  updateOrderPaymentStatus,
   updateOrderStatus,
   type AdminOrderListParams,
 } from "@/lib/api";
@@ -16,8 +17,10 @@ import type { PaginationMeta } from "@/types/api";
 import type { Order } from "@/types/order";
 
 type OrderStatus = NonNullable<Order["status"]>;
+type PaymentStatus = NonNullable<Order["payment_status"]>;
 
 const statuses: OrderStatus[] = ["pending", "paid", "shipping", "completed", "cancelled"];
+const paymentStatuses: PaymentStatus[] = ["unpaid", "pending", "paid", "failed", "refunded"];
 
 const statusHints: Record<OrderStatus, string> = {
   pending: "Order was created and is waiting for payment or review.",
@@ -33,6 +36,14 @@ const statusTone: Record<OrderStatus, "secondary" | "outline" | "destructive"> =
   shipping: "outline",
   completed: "secondary",
   cancelled: "destructive",
+};
+
+const paymentStatusTone: Record<PaymentStatus, "secondary" | "outline" | "destructive"> = {
+  unpaid: "outline",
+  pending: "outline",
+  paid: "secondary",
+  failed: "destructive",
+  refunded: "destructive",
 };
 
 function formatVND(value?: number) {
@@ -65,6 +76,10 @@ function shippingLabel(method?: string) {
 
 function paymentLabel(method?: string) {
   return method === "demo_payment" ? "Demo payment" : method === "cod" ? "COD" : "Not provided";
+}
+
+function paymentStatusLabel(status?: string) {
+  return status ? status.replaceAll("_", " ") : "unknown";
 }
 
 function buildParams(
@@ -110,9 +125,11 @@ export default function AdminOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderId, setOrderId] = useState("");
   const [status, setStatus] = useState<OrderStatus>("pending");
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingPayment, setSavingPayment] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -146,6 +163,9 @@ export default function AdminOrdersPage() {
       }
       if (order?.status) {
         setStatus(order.status as OrderStatus);
+      }
+      if (order?.payment_status) {
+        setPaymentStatus(order.payment_status as PaymentStatus);
       }
     } catch (err) {
       setDetailError(err instanceof Error ? err.message : "Failed to load order detail");
@@ -218,6 +238,29 @@ export default function AdminOrdersPage() {
       setDetailError(err instanceof Error ? err.message : "Failed to update order status");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onPaymentSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSavingPayment(true);
+    setError(null);
+    setDetailError(null);
+    setSuccess(null);
+
+    try {
+      const res = await updateOrderPaymentStatus(orderId, { payment_status: paymentStatus });
+      const updated = res.data ?? null;
+      setSelectedOrder(updated);
+      setSuccess("Payment status updated.");
+      await loadOrders(page, appliedFilters);
+      if (updated?.id) {
+        await loadOrderDetail(updated.id);
+      }
+    } catch (err) {
+      setDetailError(err instanceof Error ? err.message : "Failed to update payment status");
+    } finally {
+      setSavingPayment(false);
     }
   }
 
@@ -365,10 +408,11 @@ export default function AdminOrdersPage() {
 
             {!loading && orders.length > 0 ? (
               <div className="overflow-x-auto rounded-2xl border border-border">
-                <div className="hidden grid-cols-[1.2fr_1fr_110px_120px] gap-4 bg-muted/60 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground lg:grid">
+                <div className="hidden grid-cols-[1.2fr_1fr_110px_120px_120px] gap-4 bg-muted/60 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground lg:grid">
                   <span>Order</span>
                   <span>Customer</span>
                   <span>Status</span>
+                  <span>Payment</span>
                   <span className="text-right">Total</span>
                 </div>
                 <div className="divide-y divide-border">
@@ -376,7 +420,7 @@ export default function AdminOrdersPage() {
                     <button
                       key={order.id}
                       type="button"
-                      className="grid w-full min-w-0 gap-4 p-4 text-left transition hover:bg-muted/50 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_110px_120px] lg:items-center"
+                      className="grid w-full min-w-0 gap-4 p-4 text-left transition hover:bg-muted/50 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_110px_120px_120px] lg:items-center"
                       onClick={() => order.id && loadOrderDetail(order.id)}
                     >
                       <div className="min-w-0">
@@ -391,6 +435,12 @@ export default function AdminOrdersPage() {
                       </div>
                       <Badge variant={statusTone[(order.status as OrderStatus) ?? "pending"]} className="capitalize">
                         {order.status}
+                      </Badge>
+                      <Badge
+                        variant={paymentStatusTone[(order.payment_status as PaymentStatus) ?? "unpaid"]}
+                        className="capitalize"
+                      >
+                        {paymentStatusLabel(order.payment_status)}
                       </Badge>
                       <p className="font-heading text-lg font-semibold lg:text-right">
                         {formatVND(order.total_amount)}
@@ -484,16 +534,72 @@ export default function AdminOrdersPage() {
 
         <Card className="surface-card rounded-[1.75rem]">
           <CardHeader>
+            <p className="eyebrow">Payment control</p>
+            <CardTitle className="text-3xl">Update Payment Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-4" onSubmit={onPaymentSubmit}>
+              <div className="space-y-1.5">
+                <label htmlFor="payment-order-id" className="text-sm font-medium">
+                  Order ID
+                </label>
+                <Input
+                  id="payment-order-id"
+                  value={orderId}
+                  onChange={(event) => setOrderId(event.target.value)}
+                  placeholder="Paste full order UUID"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="payment-status" className="text-sm font-medium">
+                  Payment status
+                </label>
+                <select
+                  id="payment-status"
+                  className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm capitalize outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                  value={paymentStatus}
+                  onChange={(event) => setPaymentStatus(event.target.value as PaymentStatus)}
+                >
+                  {paymentStatuses.map((item) => (
+                    <option key={item} value={item}>
+                      {paymentStatusLabel(item)}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Payment status is independent from fulfillment status. COD starts unpaid; demo payment starts pending.
+                </p>
+              </div>
+              <Button type="submit" disabled={savingPayment}>
+                {savingPayment ? "Updating..." : "Update payment status"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="surface-card rounded-[1.75rem]">
+          <CardHeader>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="eyebrow">Order detail</p>
                 <CardTitle className="mt-2 text-3xl">Last Updated Order</CardTitle>
               </div>
-              {selectedOrder?.status ? (
-                <Badge variant={statusTone[selectedOrder.status as OrderStatus]} className="capitalize">
-                  {selectedOrder.status}
-                </Badge>
-              ) : null}
+              <div className="flex flex-wrap gap-2">
+                {selectedOrder?.status ? (
+                  <Badge variant={statusTone[selectedOrder.status as OrderStatus]} className="capitalize">
+                    {selectedOrder.status}
+                  </Badge>
+                ) : null}
+                {selectedOrder?.payment_status ? (
+                  <Badge
+                    variant={paymentStatusTone[selectedOrder.payment_status as PaymentStatus]}
+                    className="capitalize"
+                  >
+                    Payment {paymentStatusLabel(selectedOrder.payment_status)}
+                  </Badge>
+                ) : null}
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -535,11 +641,18 @@ export default function AdminOrdersPage() {
                     <p className="mt-2 text-lg font-semibold capitalize">{selectedOrder.status}</p>
                   </div>
                   <div className="rounded-2xl bg-muted/60 p-4">
-                    <p className="text-sm text-muted-foreground">Total amount</p>
-                    <p className="mt-2 font-heading text-2xl font-semibold">
-                      {formatVND(selectedOrder.total_amount)}
+                    <p className="text-sm text-muted-foreground">Payment status</p>
+                    <p className="mt-2 text-lg font-semibold capitalize">
+                      {paymentStatusLabel(selectedOrder.payment_status)}
                     </p>
                   </div>
+                </div>
+
+                <div className="rounded-2xl bg-muted/60 p-4">
+                  <p className="text-sm text-muted-foreground">Total amount</p>
+                  <p className="mt-2 font-heading text-2xl font-semibold">
+                    {formatVND(selectedOrder.total_amount)}
+                  </p>
                 </div>
 
                 <div className="rounded-2xl border border-border bg-card/70 p-4">
@@ -559,6 +672,9 @@ export default function AdminOrdersPage() {
                       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Method</p>
                       <p className="mt-2 font-medium">{shippingLabel(selectedOrder.shipping_method)}</p>
                       <p className="mt-1 text-muted-foreground">Payment: {paymentLabel(selectedOrder.payment_method)}</p>
+                      <p className="mt-1 text-muted-foreground">
+                        Payment status: {paymentStatusLabel(selectedOrder.payment_status)}
+                      </p>
                       {selectedOrder.note ? <p className="mt-1 text-muted-foreground">Note: {selectedOrder.note}</p> : null}
                     </div>
                   </div>
