@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Bell,
   Heart,
   Menu,
   Package,
@@ -33,8 +34,9 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { fetchCart, fetchWishlist } from "@/lib/api";
+import { fetchCart, fetchMyNotifications, fetchWishlist, markNotificationRead } from "@/lib/api";
 import { getMe, getStoredUser, getToken, logout, type AuthUser } from "@/lib/auth";
+import type { UserNotification } from "@/types/notification";
 
 const publicLinks = [
   { href: "/products", label: "Products" },
@@ -94,6 +96,8 @@ export function SiteHeader() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [recentNotifications, setRecentNotifications] = useState<UserNotification[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -105,6 +109,8 @@ export function SiteHeader() {
           setUser(null);
           setCartCount(0);
           setWishlistCount(0);
+          setNotificationCount(0);
+          setRecentNotifications([]);
         }
         return;
       }
@@ -115,10 +121,12 @@ export function SiteHeader() {
       }
 
       try {
-        const [meResponse, cartResponse, wishlistResponse] = await Promise.allSettled([
+        const [meResponse, cartResponse, wishlistResponse, unreadResponse, recentResponse] = await Promise.allSettled([
           getMe(),
           fetchCart(),
           fetchWishlist({ page: 1, limit: 100 }),
+          fetchMyNotifications({ page: 1, limit: 1, unread: true }),
+          fetchMyNotifications({ page: 1, limit: 5 }),
         ]);
         if (!active) {
           return;
@@ -140,10 +148,18 @@ export function SiteHeader() {
         if (wishlistResponse.status === "fulfilled") {
           setWishlistCount(wishlistResponse.value.meta?.total ?? wishlistResponse.value.data?.length ?? 0);
         }
+        if (unreadResponse.status === "fulfilled") {
+          setNotificationCount(unreadResponse.value.meta?.total ?? unreadResponse.value.data?.length ?? 0);
+        }
+        if (recentResponse.status === "fulfilled") {
+          setRecentNotifications(recentResponse.value.data ?? []);
+        }
       } catch {
         if (active) {
           setCartCount(0);
           setWishlistCount(0);
+          setNotificationCount(0);
+          setRecentNotifications([]);
         }
       }
     }
@@ -175,7 +191,27 @@ export function SiteHeader() {
     setUser(null);
     setCartCount(0);
     setWishlistCount(0);
+    setNotificationCount(0);
+    setRecentNotifications([]);
     router.push("/login");
+  }
+
+  async function openNotification(notification: UserNotification) {
+    if (!notification.read_at) {
+      try {
+        await markNotificationRead(notification.id);
+        setRecentNotifications((current) =>
+          current.map((item) =>
+            item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item
+          )
+        );
+        setNotificationCount((current) => Math.max(0, current - 1));
+      } catch {
+        // Notification read state is convenience UI; navigation should still work.
+      }
+    }
+    const orderID = notification.metadata?.order_id;
+    router.push(typeof orderID === "string" ? `/orders/${orderID}` : "/notifications");
   }
 
   const navLinks = isAdmin ? [...publicLinks, { href: "/admin", label: "Admin" }] : publicLinks;
@@ -218,6 +254,50 @@ export function SiteHeader() {
               <BadgeCount value={cartCount} label={`${cartCount} cart items`} />
             </Link>
           </Button>
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+                  <Bell aria-hidden="true" />
+                  <BadgeCount value={notificationCount} label={`${notificationCount} unread notifications`} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {recentNotifications.length > 0 ? (
+                  recentNotifications.map((notification) => (
+                    <DropdownMenuItem
+                      key={notification.id}
+                      className="flex-col items-start gap-1 p-3"
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        void openNotification(notification);
+                      }}
+                    >
+                      <span className="flex w-full items-start justify-between gap-2">
+                        <span className="font-medium">{notification.title}</span>
+                        {!notification.read_at ? (
+                          <span className="mt-1 size-2 rounded-full bg-primary" aria-label="Unread" />
+                        ) : null}
+                      </span>
+                      <span className="line-clamp-2 text-xs text-muted-foreground">
+                        {notification.message}
+                      </span>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <DropdownMenuItem disabled className="p-3 text-muted-foreground">
+                    No notifications yet.
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/notifications">View all notifications</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
           <ThemeToggle />
 
           {user ? (
@@ -282,7 +362,7 @@ export function SiteHeader() {
                 <SearchForm onSubmitted={() => setMobileOpen(false)} />
               </div>
               <nav className="grid gap-1 px-5" aria-label="Mobile navigation">
-                {[...navLinks, { href: "/cart", label: "Cart" }, { href: "/wishlist", label: "Wishlist" }, { href: "/orders", label: "Orders" }, { href: "/profile", label: "Profile" }].map((link) => (
+                {[...navLinks, { href: "/cart", label: "Cart" }, { href: "/wishlist", label: "Wishlist" }, { href: "/orders", label: "Orders" }, { href: "/notifications", label: "Notifications" }, { href: "/profile", label: "Profile" }].map((link) => (
                   <SheetClose asChild key={link.href}>
                     <Link className="rounded-2xl px-4 py-3 text-sm font-medium transition hover:bg-muted" href={link.href}>
                       {link.label}

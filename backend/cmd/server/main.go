@@ -21,6 +21,7 @@ import (
 	"stylemind/internal/database"
 	"stylemind/internal/health"
 	"stylemind/internal/middleware"
+	"stylemind/internal/notification"
 	"stylemind/internal/order"
 	"stylemind/internal/product"
 	"stylemind/internal/returns"
@@ -139,6 +140,10 @@ func main() {
 	userService := user.NewService(userRepo)
 	user.RegisterRoutes(admin, userService, auditService)
 
+	notificationRepo := notification.NewRepository(db)
+	notificationService := notification.NewService(notificationRepo)
+	notification.RegisterRoutes(api, jwtAuth, notificationService)
+
 	categoryRepo := category.NewRepository(db)
 	categoryService := category.NewService(categoryRepo)
 	category.RegisterRoutes(api, admin, categoryService, auditService)
@@ -165,11 +170,11 @@ func main() {
 
 	orderRepo := order.NewRepository(db)
 	orderService := order.NewService(orderRepo)
-	order.RegisterRoutes(api, admin, jwtAuth, orderService, auditService)
+	order.RegisterRoutes(api, admin, jwtAuth, orderService, auditService, notificationService)
 
 	returnRepo := returns.NewRepository(db)
 	returnService := returns.NewService(returnRepo)
-	returns.RegisterRoutes(api, admin, jwtAuth, returnService, auditService)
+	returns.RegisterRoutes(api, admin, jwtAuth, returnService, auditService, notificationService)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,

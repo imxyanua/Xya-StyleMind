@@ -1,11 +1,13 @@
 package order
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
 	"stylemind/internal/audit"
 	"stylemind/internal/errs"
+	"stylemind/internal/notification"
 	"stylemind/pkg/logger"
 	"time"
 
@@ -17,16 +19,27 @@ import (
 )
 
 type Handler struct {
-	service *Service
-	audit   audit.Recorder
+	service       *Service
+	audit         audit.Recorder
+	notifications notifier
 }
 
-func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, authMiddleware gin.HandlerFunc, service *Service, recorders ...audit.Recorder) {
+type notifier interface {
+	Create(ctx context.Context, input notification.CreateInput) (*notification.Notification, error)
+}
+
+func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, authMiddleware gin.HandlerFunc, service *Service, extras ...any) {
 	var recorder audit.Recorder
-	if len(recorders) > 0 {
-		recorder = recorders[0]
+	var notifications notifier
+	for _, extra := range extras {
+		if candidate, ok := extra.(audit.Recorder); ok {
+			recorder = candidate
+		}
+		if candidate, ok := extra.(notifier); ok {
+			notifications = candidate
+		}
 	}
-	h := &Handler{service: service, audit: recorder}
+	h := &Handler{service: service, audit: recorder, notifications: notifications}
 
 	orders := api.Group("/orders")
 	orders.Use(authMiddleware)
@@ -89,6 +102,14 @@ func (h *Handler) Checkout(c *gin.Context) {
 		}
 		return
 	}
+	h.notify(c, order.UserID, notification.TypeOrderCreated, "Order placed successfully", "Your order has been created and is waiting for processing.", gin.H{
+		"order_id":        order.ID,
+		"status":          order.Status,
+		"payment_status":  order.PaymentStatus,
+		"total_amount":    order.TotalAmount,
+		"discount_amount": order.DiscountAmount,
+		"coupon_code":     order.CouponCode,
+	})
 	response.Success(c, http.StatusCreated, "order created", order)
 }
 
@@ -245,6 +266,11 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 		"new_status": order.Status,
 	})
 	h.recordAudit(c, "admin.order_status.update", order.ID, audit.ResultSuccess, gin.H{"old_status": currentOrder.Status, "new_status": order.Status})
+	h.notify(c, order.UserID, notification.TypeOrderStatusUpdated, "Order status updated", "Your order status changed from "+currentOrder.Status+" to "+order.Status+".", gin.H{
+		"order_id":   order.ID,
+		"old_status": currentOrder.Status,
+		"new_status": order.Status,
+	})
 	response.Success(c, http.StatusOK, "order status updated", order)
 }
 
@@ -324,7 +350,25 @@ func (h *Handler) UpdatePaymentStatus(c *gin.Context) {
 		"new_payment_status": order.PaymentStatus,
 	})
 	h.recordAudit(c, "admin.order_payment_status.update", order.ID, audit.ResultSuccess, gin.H{"old_payment_status": currentOrder.PaymentStatus, "new_payment_status": order.PaymentStatus})
+	h.notify(c, order.UserID, notification.TypePaymentStatusUpdated, "Payment status updated", "Your payment status changed from "+currentOrder.PaymentStatus+" to "+order.PaymentStatus+".", gin.H{
+		"order_id":           order.ID,
+		"old_payment_status": currentOrder.PaymentStatus,
+		"new_payment_status": order.PaymentStatus,
+	})
 	response.Success(c, http.StatusOK, "payment status updated", order)
+}
+
+func (h *Handler) notify(c *gin.Context, userID, notificationType, title, message string, metadata map[string]any) {
+	if h.notifications == nil || userID == "" {
+		return
+	}
+	_, _ = h.notifications.Create(c.Request.Context(), notification.CreateInput{
+		UserID:   userID,
+		Type:     notificationType,
+		Title:    title,
+		Message:  message,
+		Metadata: metadata,
+	})
 }
 
 func (h *Handler) recordAudit(c *gin.Context, action, resourceID, result string, metadata map[string]any) {

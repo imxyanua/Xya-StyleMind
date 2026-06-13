@@ -2,6 +2,7 @@ package order
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"stylemind/internal/auth"
 	"stylemind/internal/errs"
 	"stylemind/internal/middleware"
+	"stylemind/internal/notification"
 	"stylemind/pkg/logger"
 
 	"github.com/gin-gonic/gin"
@@ -71,6 +73,41 @@ func newProtectedOrderTestRouterWithRecorder(repo *fakeOrderRepository, secret s
 	return router
 }
 
+func newOrderTestRouterWithNotifier(repo *fakeOrderRepository, notifier *fakeOrderNotifier) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("request_id", "req-order-audit-1")
+		c.Next()
+	})
+	api := router.Group("/api/v1")
+	admin := api.Group("/admin")
+	authMiddleware := func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		c.Set("user_role", "user")
+		c.Next()
+	}
+	RegisterRoutes(api, admin, authMiddleware, NewService(repo), notifier)
+	return router
+}
+
+func newProtectedOrderTestRouterWithNotifier(repo *fakeOrderRepository, secret string, notifier *fakeOrderNotifier) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("request_id", "req-order-audit-1")
+		c.Next()
+	})
+	api := router.Group("/api/v1")
+	admin := api.Group("/admin")
+	tokenConfig := orderTestTokenConfig()
+	tokenConfig.Secret = secret
+	jwtAuth := middleware.JWTAuth(tokenConfig)
+	admin.Use(jwtAuth, middleware.RequireRole("admin"))
+	RegisterRoutes(api, admin, jwtAuth, NewService(repo), notifier)
+	return router
+}
+
 type recordedOrderAudit struct {
 	action       string
 	resourceType string
@@ -85,6 +122,15 @@ type fakeOrderAuditRecorder struct {
 
 func (r *fakeOrderAuditRecorder) RecordAdmin(_ *gin.Context, action, resourceType, resourceID, result string, metadata map[string]any) {
 	r.events = append(r.events, recordedOrderAudit{action: action, resourceType: resourceType, resourceID: resourceID, result: result, metadata: metadata})
+}
+
+type fakeOrderNotifier struct {
+	events []notification.CreateInput
+}
+
+func (n *fakeOrderNotifier) Create(_ context.Context, input notification.CreateInput) (*notification.Notification, error) {
+	n.events = append(n.events, input)
+	return &notification.Notification{ID: uuid.NewString(), UserID: input.UserID, Type: input.Type, Title: input.Title, Message: input.Message, Metadata: input.Metadata}, nil
 }
 
 func validCheckoutBody() *bytes.Buffer {
@@ -177,6 +223,28 @@ func TestHandlerCheckout_PropagatesRequestDeadlineToRepository(t *testing.T) {
 	}
 	if !repo.contextHadDeadline {
 		t.Fatal("repository did not receive request context deadline")
+	}
+}
+
+func TestHandlerCheckout_WritesNotification(t *testing.T) {
+	orderID := uuid.NewString()
+	notifier := &fakeOrderNotifier{}
+	router := newOrderTestRouterWithNotifier(&fakeOrderRepository{orderID: orderID}, notifier)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/orders", validCheckoutBody())
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201, body=%s", w.Code, w.Body.String())
+	}
+	if len(notifier.events) != 1 {
+		t.Fatalf("notifications = %d, want 1", len(notifier.events))
+	}
+	event := notifier.events[0]
+	if event.UserID != "user-1" || event.Type != notification.TypeOrderCreated || event.Metadata["order_id"] != orderID {
+		t.Fatalf("notification = %+v, want order.created for user/order", event)
 	}
 }
 
@@ -571,6 +639,35 @@ func TestProtectedAdminOrderStatus_AdminAllowed(t *testing.T) {
 		"request_id": "req-order-audit-1",
 	})
 	assertOrderAuditDoesNotContain(t, audit.String(), token, "Authorization", "Bearer")
+}
+
+func TestProtectedAdminOrderStatus_WritesNotification(t *testing.T) {
+	notifier := &fakeOrderNotifier{}
+	repo := &fakeOrderRepository{currentStatus: StatusPending}
+	router := newProtectedOrderTestRouterWithNotifier(repo, "test-secret", notifier)
+
+	token, err := auth.GenerateToken(orderTestTokenConfig(), "admin-1", "admin")
+	if err != nil {
+		t.Fatalf("GenerateToken error = %v", err)
+	}
+
+	orderID := uuid.NewString()
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/orders/"+orderID+"/status", bytes.NewBufferString(`{"status":"paid"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", w.Code, w.Body.String())
+	}
+	if len(notifier.events) != 1 {
+		t.Fatalf("notifications = %d, want 1", len(notifier.events))
+	}
+	event := notifier.events[0]
+	if event.Type != notification.TypeOrderStatusUpdated || event.UserID != "user-1" || event.Metadata["new_status"] != StatusPaid {
+		t.Fatalf("notification = %+v, want order status update", event)
+	}
 }
 
 func TestProtectedAdminOrderStatus_PatchAllowed(t *testing.T) {

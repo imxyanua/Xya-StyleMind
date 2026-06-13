@@ -13,6 +13,7 @@ import (
 	"stylemind/internal/auth"
 	"stylemind/internal/errs"
 	"stylemind/internal/middleware"
+	"stylemind/internal/notification"
 	"stylemind/internal/order"
 
 	"github.com/gin-gonic/gin"
@@ -124,6 +125,15 @@ func (r *fakeAuditRecorder) RecordAdmin(_ *gin.Context, action, resourceType, re
 	r.events = append(r.events, recordedReturnAudit{action: action, resourceType: resourceType, resourceID: resourceID, result: result, metadata: metadata})
 }
 
+type fakeReturnNotifier struct {
+	events []notification.CreateInput
+}
+
+func (n *fakeReturnNotifier) Create(_ context.Context, input notification.CreateInput) (*notification.Notification, error) {
+	n.events = append(n.events, input)
+	return &notification.Notification{ID: uuid.NewString(), UserID: input.UserID, Type: input.Type, Title: input.Title, Message: input.Message, Metadata: input.Metadata}, nil
+}
+
 func newReturnRouter(store *fakeStore, recorders ...*fakeAuditRecorder) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -143,6 +153,24 @@ func newReturnRouter(store *fakeStore, recorders ...*fakeAuditRecorder) *gin.Eng
 	} else {
 		RegisterRoutes(api, admin, authMiddleware, NewService(store))
 	}
+	return router
+}
+
+func newReturnRouterWithNotifier(store *fakeStore, recorder *fakeAuditRecorder, notifier *fakeReturnNotifier) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("request_id", "req-return-test")
+		c.Next()
+	})
+	api := router.Group("/api/v1")
+	admin := api.Group("/admin")
+	authMiddleware := func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		c.Set("user_role", "user")
+		c.Next()
+	}
+	RegisterRoutes(api, admin, authMiddleware, NewService(store), recorder, notifier)
 	return router
 }
 
@@ -255,6 +283,34 @@ func TestAdminApproveReturnRequestWritesAudit(t *testing.T) {
 	}
 	if event.metadata["new_payment_status"] != order.PaymentStatusRefunded {
 		t.Fatalf("metadata = %+v", event.metadata)
+	}
+}
+
+func TestAdminApproveReturnRequestWritesNotification(t *testing.T) {
+	recorder := &fakeAuditRecorder{}
+	notifier := &fakeReturnNotifier{}
+	store := &fakeStore{}
+	router := newReturnRouterWithNotifier(store, recorder, notifier)
+	id := uuid.NewString()
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/return-requests/"+id+"/status", bytes.NewBufferString(`{"status":"approved","admin_note":"Refund approved."}`))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 body=%s", w.Code, w.Body.String())
+	}
+	if len(notifier.events) != 2 {
+		t.Fatalf("notifications = %d, want 2", len(notifier.events))
+	}
+	event := notifier.events[0]
+	if event.UserID != "user-1" || event.Type != notification.TypeReturnRequestApproved || event.Metadata["order_id"] == "" {
+		t.Fatalf("notification = %+v, want return approved event", event)
+	}
+	paymentEvent := notifier.events[1]
+	if paymentEvent.Type != notification.TypePaymentStatusUpdated || paymentEvent.Metadata["new_payment_status"] != order.PaymentStatusRefunded {
+		t.Fatalf("notification = %+v, want payment status event", paymentEvent)
 	}
 }
 

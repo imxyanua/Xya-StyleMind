@@ -641,6 +641,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List current user's notifications */
+        get: operations["listMyNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Mark one notification as read */
+        patch: operations["markNotificationRead"];
+        trace?: never;
+    };
+    "/api/v1/me/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Mark all current user's notifications as read */
+        patch: operations["markAllNotificationsRead"];
+        trace?: never;
+    };
     "/api/v1/me/addresses": {
         parameters: {
             query?: never;
@@ -1112,6 +1163,49 @@ export interface components {
             message?: string;
             data?: components["schemas"]["Product"][];
             meta?: components["schemas"]["PaginationMeta"];
+        };
+        /** @description User-facing notification. Metadata is sanitized and must not contain tokens, passwords, secrets, or internal errors. */
+        Notification: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            user_id?: string;
+            /** @example order.status_updated */
+            type?: string;
+            title?: string;
+            message?: string;
+            /**
+             * @example {
+             *       "order_id": "3f9b5f41-7976-49a1-a801-fd4e339b75b5"
+             *     }
+             */
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            read_at?: string | null;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        NotificationResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["Notification"];
+        };
+        NotificationListResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["Notification"][];
+            meta?: components["schemas"]["PaginationMeta"];
+        };
+        MarkAllNotificationsReadResponse: {
+            /** Format: int64 */
+            updated?: number;
+        };
+        MarkAllNotificationsReadResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["MarkAllNotificationsReadResponse"];
         };
         UserAddress: {
             /** Format: uuid */
@@ -2908,6 +3002,87 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReturnRequestListResponseEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listMyNotifications: {
+        parameters: {
+            query?: {
+                /** @example 1 */
+                page?: components["parameters"]["PageParam"];
+                /** @example 20 */
+                limit?: components["parameters"]["LimitParam"];
+                /** @description When true, only unread notifications are returned. */
+                unread?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Notification list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationListResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    markNotificationRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Notification marked read */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    markAllNotificationsRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Notifications marked read */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkAllNotificationsReadResponseEnvelope"];
                 };
             };
             401: components["responses"]["Unauthorized"];

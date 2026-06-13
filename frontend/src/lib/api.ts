@@ -4,6 +4,7 @@ import type { Cart } from "@/types/cart";
 import type { Category } from "@/types/category";
 import type { ApplyCouponResult, Coupon } from "@/types/coupon";
 import type { AdminDashboardStats } from "@/types/dashboard";
+import type { UserNotification } from "@/types/notification";
 import type { components, operations } from "@/types/openapi";
 import type { Order } from "@/types/order";
 import type { Product } from "@/types/product";
@@ -268,6 +269,36 @@ export async function deleteMyAddress(id: string) {
 
 export async function setDefaultMyAddress(id: string) {
   return apiRequest<UserAddress>(`/me/addresses/${id}/default`, { method: "PATCH" });
+}
+
+export type NotificationListParams = NonNullable<
+  operations["listMyNotifications"]["parameters"]["query"]
+>;
+export type MarkAllNotificationsReadResult =
+  components["schemas"]["MarkAllNotificationsReadResponse"];
+
+export async function fetchMyNotifications(params: NotificationListParams = {}) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || (typeof value === "string" && value === "")) {
+      continue;
+    }
+    searchParams.set(key, String(value));
+  }
+  const query = searchParams.toString();
+  return apiRequest<UserNotification[]>(`/me/notifications${query ? `?${query}` : ""}`, {
+    method: "GET",
+  });
+}
+
+export async function markNotificationRead(id: string) {
+  return apiRequest<UserNotification>(`/me/notifications/${id}/read`, { method: "PATCH" });
+}
+
+export async function markAllNotificationsRead() {
+  return apiRequest<MarkAllNotificationsReadResult>("/me/notifications/read-all", {
+    method: "PATCH",
+  });
 }
 
 type OrderListParams = {

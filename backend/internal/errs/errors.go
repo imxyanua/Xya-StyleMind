@@ -36,6 +36,7 @@ var (
 	ErrCouponUsageLimitReached        = errors.New("coupon usage limit reached")
 	ErrCouponMinOrderNotMet           = errors.New("coupon minimum order amount not met")
 	ErrInvalidCoupon                  = errors.New("invalid coupon")
+	ErrNotificationNotFound           = errors.New("notification not found")
 	ErrReturnRequestNotFound          = errors.New("return request not found")
 	ErrReturnRequestAlreadyExists     = errors.New("return request already exists")
 	ErrReturnRequestNotAllowed        = errors.New("return request not allowed")

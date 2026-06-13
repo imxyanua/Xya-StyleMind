@@ -1,12 +1,14 @@
 package returns
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
 
 	"stylemind/internal/audit"
 	"stylemind/internal/errs"
+	"stylemind/internal/notification"
 	"stylemind/pkg/logger"
 	"stylemind/pkg/pagination"
 	"stylemind/pkg/response"
@@ -16,16 +18,27 @@ import (
 )
 
 type Handler struct {
-	service *Service
-	audit   audit.Recorder
+	service       *Service
+	audit         audit.Recorder
+	notifications notifier
 }
 
-func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, authMiddleware gin.HandlerFunc, service *Service, recorders ...audit.Recorder) {
+type notifier interface {
+	Create(ctx context.Context, input notification.CreateInput) (*notification.Notification, error)
+}
+
+func RegisterRoutes(api *gin.RouterGroup, admin *gin.RouterGroup, authMiddleware gin.HandlerFunc, service *Service, extras ...any) {
 	var recorder audit.Recorder
-	if len(recorders) > 0 {
-		recorder = recorders[0]
+	var notifications notifier
+	for _, extra := range extras {
+		if candidate, ok := extra.(audit.Recorder); ok {
+			recorder = candidate
+		}
+		if candidate, ok := extra.(notifier); ok {
+			notifications = candidate
+		}
 	}
-	h := &Handler{service: service, audit: recorder}
+	h := &Handler{service: service, audit: recorder, notifications: notifications}
 
 	orders := api.Group("/orders")
 	orders.Use(authMiddleware)
@@ -145,7 +158,53 @@ func (h *Handler) UpdateStatus(c *gin.Context) {
 		"new_payment_status": item.Order.PaymentStatus,
 	}
 	h.auditSuccess(c, item.ID, actionForStatus(item.Status), metadata)
+	h.notifyReturnDecision(c, item, current)
 	response.Success(c, http.StatusOK, "return request updated", item)
+}
+
+func (h *Handler) notifyReturnDecision(c *gin.Context, item, previous *Request) {
+	if h.notifications == nil || item == nil {
+		return
+	}
+	var notificationType, title, message string
+	switch item.Status {
+	case StatusApproved:
+		notificationType = notification.TypeReturnRequestApproved
+		title = "Return request approved"
+		message = "Your return/refund request has been approved."
+	case StatusRejected:
+		notificationType = notification.TypeReturnRequestRejected
+		title = "Return request rejected"
+		message = "Your return/refund request has been rejected."
+	default:
+		return
+	}
+	_, _ = h.notifications.Create(c.Request.Context(), notification.CreateInput{
+		UserID:  item.UserID,
+		Type:    notificationType,
+		Title:   title,
+		Message: message,
+		Metadata: gin.H{
+			"return_request_id": item.ID,
+			"order_id":          item.OrderID,
+			"status":            item.Status,
+			"admin_note":        item.AdminNote,
+		},
+	})
+	if item.Status == StatusApproved && item.Order != nil && previous != nil && previous.Order != nil && item.Order.PaymentStatus != previous.Order.PaymentStatus {
+		_, _ = h.notifications.Create(c.Request.Context(), notification.CreateInput{
+			UserID:  item.UserID,
+			Type:    notification.TypePaymentStatusUpdated,
+			Title:   "Payment status updated",
+			Message: "Your payment status changed from " + previous.Order.PaymentStatus + " to " + item.Order.PaymentStatus + ".",
+			Metadata: gin.H{
+				"order_id":           item.OrderID,
+				"old_payment_status": previous.Order.PaymentStatus,
+				"new_payment_status": item.Order.PaymentStatus,
+				"return_request_id":  item.ID,
+			},
+		})
+	}
 }
 
 func handleCreateError(c *gin.Context, err error) {

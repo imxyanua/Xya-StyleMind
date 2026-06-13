@@ -173,6 +173,25 @@ func TestCouponsMigrationHasConstraints(t *testing.T) {
 	}
 }
 
+func TestNotificationsMigrationHasIndexes(t *testing.T) {
+	sql := readMigrationForTest(t, "0013_create_notifications.sql")
+
+	required := []string{
+		"CREATE TABLE IF NOT EXISTS notifications",
+		"user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE",
+		"metadata JSONB NOT NULL DEFAULT '{}'::jsonb",
+		"read_at TIMESTAMPTZ",
+		"CREATE INDEX IF NOT EXISTS idx_notifications_user_created_at",
+		"CREATE INDEX IF NOT EXISTS idx_notifications_user_read_created_at",
+	}
+
+	for _, text := range required {
+		if !strings.Contains(sql, text) {
+			t.Fatalf("notifications migration missing %q", text)
+		}
+	}
+}
+
 func migrationFilesForTest(t *testing.T) []string {
 	t.Helper()
 

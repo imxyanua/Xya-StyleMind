@@ -87,7 +87,7 @@ func (r *fakeOrderRepository) GetOrderByIDForUser(_ context.Context, orderID, us
 	if r.getOrderForUserErr != nil {
 		return nil, r.getOrderForUserErr
 	}
-	return &OrderResponse{ID: orderID, UserID: userID, Status: StatusPending, Items: []OrderItem{}}, nil
+	return &OrderResponse{ID: orderID, UserID: userID, Status: StatusPending, PaymentStatus: PaymentStatusUnpaid, Items: []OrderItem{}}, nil
 }
 
 func (r *fakeOrderRepository) ListOrdersByUser(_ context.Context, userID string, limit, offset int) ([]OrderResponse, int64, error) {
@@ -150,7 +150,7 @@ func (r *fakeOrderRepository) GetOrderByID(_ context.Context, orderID string) (*
 	if paymentStatus == "" {
 		paymentStatus = PaymentStatusUnpaid
 	}
-	return &OrderResponse{ID: orderID, Status: status, PaymentStatus: paymentStatus, Items: []OrderItem{}}, nil
+	return &OrderResponse{ID: orderID, UserID: "user-1", Status: status, PaymentStatus: paymentStatus, Items: []OrderItem{}}, nil
 }
 
 func TestServiceCheckout_Success(t *testing.T) {
