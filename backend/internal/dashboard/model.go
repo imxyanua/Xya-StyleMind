@@ -32,11 +32,13 @@ type RecentOrder struct {
 }
 
 type LowStockProduct struct {
-	ID       string  `json:"id"`
-	Name     string  `json:"name"`
-	Stock    int     `json:"stock"`
-	Price    float64 `json:"price"`
-	ImageURL string  `json:"image_url"`
+	ID               string  `json:"id"`
+	Name             string  `json:"name"`
+	Stock            int     `json:"stock"`
+	ReservedQuantity int     `json:"reserved_quantity"`
+	AvailableStock   int     `json:"available_stock"`
+	Price            float64 `json:"price"`
+	ImageURL         string  `json:"image_url"`
 }
 
 type RevenueByDay struct {
@@ -53,13 +55,14 @@ type TopProduct struct {
 }
 
 type Stats struct {
-	TotalRevenue     float64           `json:"total_revenue"`
-	TotalOrders      int64             `json:"total_orders"`
-	TotalProducts    int64             `json:"total_products"`
-	TotalUsers       int64             `json:"total_users"`
-	OrdersByStatus   OrdersByStatus    `json:"orders_by_status"`
-	RecentOrders     []RecentOrder     `json:"recent_orders"`
-	LowStockProducts []LowStockProduct `json:"low_stock_products"`
-	RevenueByDay     []RevenueByDay    `json:"revenue_by_day"`
-	TopProducts      []TopProduct      `json:"top_products"`
+	TotalRevenue       float64           `json:"total_revenue"`
+	TotalOrders        int64             `json:"total_orders"`
+	TotalProducts      int64             `json:"total_products"`
+	TotalUsers         int64             `json:"total_users"`
+	ActiveReservations int64             `json:"active_reservations"`
+	OrdersByStatus     OrdersByStatus    `json:"orders_by_status"`
+	RecentOrders       []RecentOrder     `json:"recent_orders"`
+	LowStockProducts   []LowStockProduct `json:"low_stock_products"`
+	RevenueByDay       []RevenueByDay    `json:"revenue_by_day"`
+	TopProducts        []TopProduct      `json:"top_products"`
 }

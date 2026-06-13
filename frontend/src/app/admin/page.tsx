@@ -83,6 +83,12 @@ function metricCards(stats: AdminDashboardStats) {
       href: "/admin/products",
     },
     {
+      label: "Reservations",
+      value: formatNumber(stats.active_reservations),
+      hint: "Active inventory holds",
+      href: "/admin/products",
+    },
+    {
       label: "Users",
       value: formatNumber(stats.total_users),
       hint: "Registered accounts",
@@ -156,7 +162,7 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {metricCards(stats).map((card) => (
           <Card key={card.label} className="surface-card rounded-[1.75rem] transition hover:-translate-y-1">
             <CardHeader>
@@ -258,9 +264,16 @@ export default function AdminPage() {
                   className="flex items-center justify-between gap-3 rounded-2xl bg-muted/60 px-4 py-3 text-sm transition hover:bg-muted"
                 >
                   <span className="line-clamp-1 font-medium">{product.name}</span>
-                  <Badge variant={(product.stock ?? 0) <= 2 ? "destructive" : "secondary"}>
-                    Stock {product.stock ?? 0}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge variant={(product.available_stock ?? product.stock ?? 0) <= 2 ? "destructive" : "secondary"}>
+                      Available {product.available_stock ?? product.stock ?? 0}
+                    </Badge>
+                    {product.reserved_quantity ? (
+                      <span className="text-xs text-muted-foreground">
+                        {product.reserved_quantity} reserved / {product.stock ?? 0} stock
+                      </span>
+                    ) : null}
+                  </div>
                 </Link>
               ))
             )}

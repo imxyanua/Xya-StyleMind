@@ -30,17 +30,18 @@ func (s *fakeDashboardStore) GetStats(_ context.Context, filter StatsFilter) (*S
 		return s.stats, nil
 	}
 	return &Stats{
-		TotalRevenue:  300000,
-		TotalOrders:   3,
-		TotalProducts: 2,
-		TotalUsers:    4,
+		TotalRevenue:       300000,
+		TotalOrders:        3,
+		TotalProducts:      2,
+		TotalUsers:         4,
+		ActiveReservations: 2,
 		OrdersByStatus: OrdersByStatus{
 			Pending:   1,
 			Paid:      1,
 			Completed: 1,
 		},
 		RecentOrders:     []RecentOrder{{ID: "order-1", UserEmail: "buyer@example.com", Status: "paid", TotalAmount: 100000, CreatedAt: time.Now()}},
-		LowStockProducts: []LowStockProduct{{ID: "product-1", Name: "Low Tee", Stock: 2, Price: 99000}},
+		LowStockProducts: []LowStockProduct{{ID: "product-1", Name: "Low Tee", Stock: 2, ReservedQuantity: 1, AvailableStock: 1, Price: 99000}},
 		RevenueByDay:     []RevenueByDay{{Date: "2026-06-06", Revenue: 300000}},
 		TopProducts:      []TopProduct{{ID: "product-1", Name: "Low Tee", QuantitySold: 3, Revenue: 300000}},
 	}, nil
@@ -89,7 +90,7 @@ func TestAdminDashboardStatsRoute_RequiresAdminAndReturnsStats(t *testing.T) {
 	if store.filter.From == nil || store.filter.To == nil {
 		t.Fatalf("filter = %+v, want from/to", store.filter)
 	}
-	for _, want := range []string{"\"total_revenue\":300000", "\"total_orders\":3", "\"low_stock_products\"", "\"recent_orders\""} {
+	for _, want := range []string{"\"total_revenue\":300000", "\"total_orders\":3", "\"active_reservations\":2", "\"available_stock\":1", "\"low_stock_products\"", "\"recent_orders\""} {
 		if !strings.Contains(w.Body.String(), want) {
 			t.Fatalf("body missing %s: %s", want, w.Body.String())
 		}

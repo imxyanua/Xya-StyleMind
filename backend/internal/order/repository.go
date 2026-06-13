@@ -8,6 +8,7 @@ import (
 	"strings"
 	"stylemind/internal/coupon"
 	"stylemind/internal/errs"
+	"stylemind/internal/inventory"
 	"time"
 
 	"github.com/google/uuid"
@@ -76,11 +77,23 @@ func (r *Repository) CreateOrderFromCart(ctx context.Context, userID, cartID str
 		return "", errs.ErrCartEmpty
 	}
 
+	now := time.Now()
+	reservationExpiresAt := now.Add(inventory.DefaultReservationTTL)
+	reservationIDs := make([]string, 0, len(items))
 	subtotal := 0.0
 	for _, item := range items {
-		if item.Quantity > item.Stock {
+		activeReservations, err := r.activeReservationsForProduct(ctx, tx, item.ProductID, now)
+		if err != nil {
+			return "", err
+		}
+		if !canReserveQuantity(item.Stock, activeReservations, item.Quantity) {
 			return "", errs.ErrInsufficientStock
 		}
+		reservationID, err := r.createReservation(ctx, tx, userID, item.ProductID, item.Quantity, reservationExpiresAt)
+		if err != nil {
+			return "", err
+		}
+		reservationIDs = append(reservationIDs, reservationID)
 		subtotal += item.Price * float64(item.Quantity)
 	}
 
@@ -153,10 +166,45 @@ func (r *Repository) CreateOrderFromCart(ctx context.Context, userID, cartID str
 		return "", err
 	}
 
+	if err := r.deleteReservations(ctx, tx, reservationIDs); err != nil {
+		return "", err
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return "", err
 	}
 	return orderID, nil
+}
+
+func (r *Repository) activeReservationsForProduct(ctx context.Context, tx pgx.Tx, productID string, now time.Time) (int, error) {
+	var quantity int
+	err := tx.QueryRow(ctx, `
+		SELECT COALESCE(SUM(quantity), 0)::int
+		FROM inventory_reservations
+		WHERE product_id = $1 AND expires_at > $2
+	`, productID, now).Scan(&quantity)
+	return quantity, err
+}
+
+func (r *Repository) createReservation(ctx context.Context, tx pgx.Tx, userID, productID string, quantity int, expiresAt time.Time) (string, error) {
+	id := uuid.NewString()
+	_, err := tx.Exec(ctx, `
+		INSERT INTO inventory_reservations (id, user_id, product_id, quantity, expires_at)
+		VALUES ($1, $2, $3, $4, $5)
+	`, id, userID, productID, quantity, expiresAt)
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+func (r *Repository) deleteReservations(ctx context.Context, tx pgx.Tx, ids []string) error {
+	for _, id := range ids {
+		if _, err := tx.Exec(ctx, `DELETE FROM inventory_reservations WHERE id = $1`, id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Repository) lockCouponByCode(ctx context.Context, tx pgx.Tx, code string) (*coupon.Coupon, error) {

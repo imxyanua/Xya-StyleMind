@@ -710,6 +710,26 @@ export interface paths {
         patch: operations["updateMyNotificationPreferences"];
         trace?: never;
     };
+    "/api/v1/me/reservations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List current user's active inventory reservations
+         * @description Returns only non-expired reservations owned by the authenticated user. Expired reservations are ignored automatically.
+         */
+        get: operations["listMyReservations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/addresses": {
         parameters: {
             query?: never;
@@ -1249,6 +1269,37 @@ export interface components {
             message?: string;
             data?: components["schemas"]["NotificationPreferences"];
         };
+        InventoryReservationProduct: {
+            /** Format: uuid */
+            id?: string;
+            name?: string;
+            price?: number;
+            stock?: number;
+            image_url?: string;
+            style?: string;
+            color?: string;
+        };
+        /** @description Active inventory hold owned by the authenticated user. Expired reservations are ignored by API and stock calculation. */
+        InventoryReservation: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            user_id?: string;
+            /** Format: uuid */
+            product_id?: string;
+            quantity?: number;
+            /** Format: date-time */
+            expires_at?: string;
+            /** Format: date-time */
+            created_at?: string;
+            product?: components["schemas"]["InventoryReservationProduct"];
+        };
+        InventoryReservationListResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["InventoryReservation"][];
+            meta?: components["schemas"]["PaginationMeta"];
+        };
         UserAddress: {
             /** Format: uuid */
             id?: string;
@@ -1582,6 +1633,8 @@ export interface components {
             id?: string;
             name?: string;
             stock?: number;
+            reserved_quantity?: number;
+            available_stock?: number;
             price?: number;
             image_url?: string;
         };
@@ -1607,6 +1660,8 @@ export interface components {
             total_products?: number;
             /** Format: int64 */
             total_users?: number;
+            /** Format: int64 */
+            active_reservations?: number;
             orders_by_status?: components["schemas"]["OrdersByStatus"];
             recent_orders?: components["schemas"]["DashboardRecentOrder"][];
             low_stock_products?: components["schemas"]["DashboardLowStockProduct"][];
@@ -3178,6 +3233,34 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listMyReservations: {
+        parameters: {
+            query?: {
+                /** @example 1 */
+                page?: components["parameters"]["PageParam"];
+                /** @example 20 */
+                limit?: components["parameters"]["LimitParam"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active reservations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryReservationListResponseEnvelope"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];

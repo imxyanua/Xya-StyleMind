@@ -21,6 +21,7 @@ tags:
   - name: Categories
   - name: Products
   - name: Cart
+  - name: Inventory
   - name: Coupons
   - name: Orders
   - name: Wishlist
@@ -1589,6 +1590,30 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/me/reservations:
+    get:
+      tags: [Inventory]
+      summary: List current user's active inventory reservations
+      description: Returns only non-expired reservations owned by the authenticated user. Expired reservations are ignored automatically.
+      operationId: listMyReservations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Active reservations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryReservationListResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/me/addresses:
     get:
       tags: [Profile]
@@ -2806,6 +2831,60 @@ components:
           type: string
         data:
           $ref: '#/components/schemas/NotificationPreferences'
+    InventoryReservationProduct:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        price:
+          type: number
+        stock:
+          type: integer
+        image_url:
+          type: string
+        style:
+          type: string
+        color:
+          type: string
+    InventoryReservation:
+      type: object
+      description: Active inventory hold owned by the authenticated user. Expired reservations are ignored by API and stock calculation.
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        product:
+          $ref: '#/components/schemas/InventoryReservationProduct'
+    InventoryReservationListResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryReservation'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
     UserAddress:
       type: object
       properties:
@@ -3439,6 +3518,10 @@ components:
           type: string
         stock:
           type: integer
+        reserved_quantity:
+          type: integer
+        available_stock:
+          type: integer
         price:
           type: number
         image_url:
@@ -3478,6 +3561,9 @@ components:
           type: integer
           format: int64
         total_users:
+          type: integer
+          format: int64
+        active_reservations:
           type: integer
           format: int64
         orders_by_status:

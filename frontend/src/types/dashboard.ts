@@ -29,6 +29,8 @@ export type DashboardLowStockProduct = GeneratedLowStockProduct & {
   id: string;
   name: string;
   stock: number;
+  reserved_quantity: number;
+  available_stock: number;
   price: number;
   image_url: string;
 };
@@ -51,6 +53,7 @@ export type AdminDashboardStats = GeneratedStats & {
   total_orders: number;
   total_products: number;
   total_users: number;
+  active_reservations: number;
   orders_by_status: DashboardOrdersByStatus;
   recent_orders: DashboardRecentOrder[];
   low_stock_products: DashboardLowStockProduct[];

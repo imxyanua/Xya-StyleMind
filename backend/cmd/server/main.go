@@ -20,6 +20,7 @@ import (
 	"stylemind/internal/dashboard"
 	"stylemind/internal/database"
 	"stylemind/internal/health"
+	"stylemind/internal/inventory"
 	"stylemind/internal/middleware"
 	"stylemind/internal/notification"
 	"stylemind/internal/order"
@@ -143,6 +144,10 @@ func main() {
 	notificationRepo := notification.NewRepository(db)
 	notificationService := notification.NewService(notificationRepo)
 	notification.RegisterRoutes(api, jwtAuth, notificationService)
+
+	inventoryRepo := inventory.NewRepository(db)
+	inventoryService := inventory.NewService(inventoryRepo)
+	inventory.RegisterRoutes(api, jwtAuth, inventoryService)
 
 	categoryRepo := category.NewRepository(db)
 	categoryService := category.NewService(categoryRepo)

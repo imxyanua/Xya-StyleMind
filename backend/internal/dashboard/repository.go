@@ -38,6 +38,13 @@ func (r *Repository) GetStats(ctx context.Context, filter StatsFilter) (*Stats, 
 	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM users`).Scan(&stats.TotalUsers); err != nil {
 		return nil, err
 	}
+	if err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM inventory_reservations
+		WHERE expires_at > NOW()
+	`).Scan(&stats.ActiveReservations); err != nil {
+		return nil, err
+	}
 	if err := r.loadOrdersByStatus(ctx, stats, whereSQL, args); err != nil {
 		return nil, err
 	}
@@ -110,10 +117,19 @@ func (r *Repository) loadRecentOrders(ctx context.Context, stats *Stats, whereSQ
 
 func (r *Repository) loadLowStockProducts(ctx context.Context, stats *Stats, limit int) error {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, name, stock, price, image_url
-		FROM products
-		WHERE stock <= 5
-		ORDER BY stock ASC, updated_at DESC, id DESC
+		WITH active_reservations AS (
+			SELECT product_id, COALESCE(SUM(quantity), 0)::int AS reserved_quantity
+			FROM inventory_reservations
+			WHERE expires_at > NOW()
+			GROUP BY product_id
+		)
+		SELECT p.id, p.name, p.stock, COALESCE(ar.reserved_quantity, 0),
+		       p.stock - COALESCE(ar.reserved_quantity, 0) AS available_stock,
+		       p.price, p.image_url
+		FROM products p
+		LEFT JOIN active_reservations ar ON ar.product_id = p.id
+		WHERE p.stock - COALESCE(ar.reserved_quantity, 0) <= 5
+		ORDER BY available_stock ASC, p.updated_at DESC, p.id DESC
 		LIMIT $1
 	`, limit)
 	if err != nil {
@@ -122,7 +138,7 @@ func (r *Repository) loadLowStockProducts(ctx context.Context, stats *Stats, lim
 	defer rows.Close()
 	for rows.Next() {
 		var item LowStockProduct
-		if err := rows.Scan(&item.ID, &item.Name, &item.Stock, &item.Price, &item.ImageURL); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.Stock, &item.ReservedQuantity, &item.AvailableStock, &item.Price, &item.ImageURL); err != nil {
 			return err
 		}
 		stats.LowStockProducts = append(stats.LowStockProducts, item)

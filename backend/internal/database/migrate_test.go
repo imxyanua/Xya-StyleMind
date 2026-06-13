@@ -212,6 +212,26 @@ func TestNotificationPreferencesMigrationHasDefaults(t *testing.T) {
 	}
 }
 
+func TestInventoryReservationsMigrationHasConstraints(t *testing.T) {
+	sql := readMigrationForTest(t, "0015_create_inventory_reservations.sql")
+
+	required := []string{
+		"CREATE TABLE IF NOT EXISTS inventory_reservations",
+		"user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE",
+		"product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE",
+		"quantity INTEGER NOT NULL CHECK (quantity > 0)",
+		"expires_at TIMESTAMPTZ NOT NULL",
+		"CREATE INDEX IF NOT EXISTS idx_inventory_reservations_user_expires_at",
+		"CREATE INDEX IF NOT EXISTS idx_inventory_reservations_product_expires_at",
+	}
+
+	for _, text := range required {
+		if !strings.Contains(sql, text) {
+			t.Fatalf("inventory reservations migration missing %q", text)
+		}
+	}
+}
+
 func migrationFilesForTest(t *testing.T) []string {
 	t.Helper()
 
