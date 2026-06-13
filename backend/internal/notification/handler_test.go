@@ -1,6 +1,7 @@
 package notification
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -77,6 +78,35 @@ func TestMarkReadAndReadAll(t *testing.T) {
 	}
 	if store.markAllUser != "user-1" {
 		t.Fatalf("markAllUser = %s, want user-1", store.markAllUser)
+	}
+}
+
+func TestNotificationPreferencesRoutes(t *testing.T) {
+	store := &fakeNotificationStore{}
+	router := newNotificationTestRouter(store, "secret")
+	token := notificationTestToken(t, "user-1")
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/me/notification-preferences", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("get status = %d, want 200 body=%s", w.Code, w.Body.String())
+	}
+	if body := w.Body.String(); !containsAll(body, `"user_id":"user-1"`, `"order_updates_enabled":true`) {
+		t.Fatalf("body = %s, want default prefs for user-1", body)
+	}
+
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPatch, "/api/v1/me/notification-preferences", bytes.NewBufferString(`{"payment_updates_enabled":false}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("patch status = %d, want 200 body=%s", w.Code, w.Body.String())
+	}
+	if store.updateUserID != "user-1" || store.updatedPrefs.PaymentUpdatesEnabled == nil || *store.updatedPrefs.PaymentUpdatesEnabled {
+		t.Fatalf("preference update = user:%s input:%+v, want user-1 payment false", store.updateUserID, store.updatedPrefs)
 	}
 }
 

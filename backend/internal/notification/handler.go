@@ -23,6 +23,8 @@ func RegisterRoutes(api *gin.RouterGroup, authMiddleware gin.HandlerFunc, servic
 	me.GET("/notifications", h.ListMine)
 	me.PATCH("/notifications/:id/read", h.MarkRead)
 	me.PATCH("/notifications/read-all", h.MarkAllRead)
+	me.GET("/notification-preferences", h.GetPreferences)
+	me.PATCH("/notification-preferences", h.UpdatePreferences)
 }
 
 func (h *Handler) ListMine(c *gin.Context) {
@@ -56,6 +58,29 @@ func (h *Handler) MarkAllRead(c *gin.Context) {
 		return
 	}
 	response.Success(c, http.StatusOK, "notifications marked read", MarkAllReadResponse{Updated: updated})
+}
+
+func (h *Handler) GetPreferences(c *gin.Context) {
+	prefs, err := h.service.GetPreferences(c.Request.Context(), c.GetString("user_id"))
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "failed to fetch notification preferences")
+		return
+	}
+	response.Success(c, http.StatusOK, "ok", prefs)
+}
+
+func (h *Handler) UpdatePreferences(c *gin.Context) {
+	var req UpdatePreferencesInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	prefs, err := h.service.UpdatePreferences(c.Request.Context(), c.GetString("user_id"), req)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "failed to update notification preferences")
+		return
+	}
+	response.Success(c, http.StatusOK, "notification preferences updated", prefs)
 }
 
 func parseFilter(c *gin.Context) (ListFilter, error) {

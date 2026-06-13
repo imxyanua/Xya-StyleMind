@@ -692,6 +692,24 @@ export interface paths {
         patch: operations["markAllNotificationsRead"];
         trace?: never;
     };
+    "/api/v1/me/notification-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get current user's notification preferences */
+        get: operations["getMyNotificationPreferences"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update current user's notification preferences */
+        patch: operations["updateMyNotificationPreferences"];
+        trace?: never;
+    };
     "/api/v1/me/addresses": {
         parameters: {
             query?: never;
@@ -1206,6 +1224,30 @@ export interface components {
             success?: boolean;
             message?: string;
             data?: components["schemas"]["MarkAllNotificationsReadResponse"];
+        };
+        /** @description Per-user in-app notification preferences. All preferences default to enabled. */
+        NotificationPreferences: {
+            /** Format: uuid */
+            user_id?: string;
+            order_updates_enabled?: boolean;
+            payment_updates_enabled?: boolean;
+            return_updates_enabled?: boolean;
+            promotion_enabled?: boolean;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        UpdateNotificationPreferencesRequest: {
+            order_updates_enabled?: boolean;
+            payment_updates_enabled?: boolean;
+            return_updates_enabled?: boolean;
+            promotion_enabled?: boolean;
+        };
+        NotificationPreferencesResponseEnvelope: {
+            success?: boolean;
+            message?: string;
+            data?: components["schemas"]["NotificationPreferences"];
         };
         UserAddress: {
             /** Format: uuid */
@@ -3085,6 +3127,57 @@ export interface operations {
                     "application/json": components["schemas"]["MarkAllNotificationsReadResponseEnvelope"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getMyNotificationPreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Notification preferences */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferencesResponseEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateMyNotificationPreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNotificationPreferencesRequest"];
+            };
+        };
+        responses: {
+            /** @description Notification preferences updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferencesResponseEnvelope"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];

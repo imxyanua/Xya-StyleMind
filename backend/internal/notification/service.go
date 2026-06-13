@@ -10,6 +10,8 @@ import (
 
 type Store interface {
 	Create(ctx context.Context, input CreateInput) (*Notification, error)
+	GetPreferences(ctx context.Context, userID string) (*Preferences, error)
+	UpdatePreferences(ctx context.Context, userID string, input UpdatePreferencesInput) (*Preferences, error)
 	ListByUser(ctx context.Context, userID string, filter ListFilter, limit, offset int) ([]Notification, int64, error)
 	MarkRead(ctx context.Context, userID, id string) (*Notification, error)
 	MarkAllRead(ctx context.Context, userID string) (int64, error)
@@ -33,8 +35,29 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (*Notification,
 	if len(input.Type) > 100 || len(input.Title) > 255 || len(input.Message) > 2000 {
 		return nil, errs.ErrValidationFailed
 	}
+	prefs, err := s.store.GetPreferences(ctx, input.UserID)
+	if err != nil {
+		return nil, err
+	}
+	if !notificationAllowed(input.Type, prefs) {
+		return nil, nil
+	}
 	input.Metadata = sanitizeMetadata(input.Metadata)
 	return s.store.Create(ctx, input)
+}
+
+func (s *Service) GetPreferences(ctx context.Context, userID string) (*Preferences, error) {
+	if userID == "" {
+		return nil, errs.ErrUnauthorized
+	}
+	return s.store.GetPreferences(ctx, userID)
+}
+
+func (s *Service) UpdatePreferences(ctx context.Context, userID string, input UpdatePreferencesInput) (*Preferences, error) {
+	if userID == "" {
+		return nil, errs.ErrUnauthorized
+	}
+	return s.store.UpdatePreferences(ctx, userID, input)
 }
 
 func (s *Service) ListMine(ctx context.Context, userID string, filter ListFilter, limit, offset int) ([]Notification, int64, error) {
@@ -67,4 +90,23 @@ func sanitizeMetadata(metadata map[string]any) map[string]any {
 		}
 	}
 	return out
+}
+
+func notificationAllowed(notificationType string, prefs *Preferences) bool {
+	if prefs == nil {
+		return true
+	}
+	switch notificationType {
+	case TypeOrderCreated, TypeOrderStatusUpdated:
+		return prefs.OrderUpdatesEnabled
+	case TypePaymentStatusUpdated:
+		return prefs.PaymentUpdatesEnabled
+	case TypeReturnRequestApproved, TypeReturnRequestRejected:
+		return prefs.ReturnUpdatesEnabled
+	default:
+		if strings.HasPrefix(notificationType, "promotion.") || strings.HasPrefix(notificationType, "coupon.") {
+			return prefs.PromotionEnabled
+		}
+		return true
+	}
 }

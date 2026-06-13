@@ -10,10 +10,13 @@ import (
 )
 
 type fakeNotificationStore struct {
-	items       []Notification
-	created     []CreateInput
-	markReadID  string
-	markAllUser string
+	items        []Notification
+	created      []CreateInput
+	preferences  map[string]*Preferences
+	updatedPrefs UpdatePreferencesInput
+	updateUserID string
+	markReadID   string
+	markAllUser  string
 }
 
 func (s *fakeNotificationStore) Create(_ context.Context, input CreateInput) (*Notification, error) {
@@ -41,6 +44,40 @@ func (s *fakeNotificationStore) ListByUser(_ context.Context, userID string, fil
 		out = append(out, item)
 	}
 	return out, int64(len(out)), nil
+}
+
+func (s *fakeNotificationStore) GetPreferences(_ context.Context, userID string) (*Preferences, error) {
+	if s.preferences != nil {
+		if prefs := s.preferences[userID]; prefs != nil {
+			return prefs, nil
+		}
+	}
+	return &Preferences{
+		UserID:                userID,
+		OrderUpdatesEnabled:   true,
+		PaymentUpdatesEnabled: true,
+		ReturnUpdatesEnabled:  true,
+		PromotionEnabled:      true,
+	}, nil
+}
+
+func (s *fakeNotificationStore) UpdatePreferences(_ context.Context, userID string, input UpdatePreferencesInput) (*Preferences, error) {
+	s.updateUserID = userID
+	s.updatedPrefs = input
+	prefs, _ := s.GetPreferences(context.Background(), userID)
+	if input.OrderUpdatesEnabled != nil {
+		prefs.OrderUpdatesEnabled = *input.OrderUpdatesEnabled
+	}
+	if input.PaymentUpdatesEnabled != nil {
+		prefs.PaymentUpdatesEnabled = *input.PaymentUpdatesEnabled
+	}
+	if input.ReturnUpdatesEnabled != nil {
+		prefs.ReturnUpdatesEnabled = *input.ReturnUpdatesEnabled
+	}
+	if input.PromotionEnabled != nil {
+		prefs.PromotionEnabled = *input.PromotionEnabled
+	}
+	return prefs, nil
 }
 
 func (s *fakeNotificationStore) MarkRead(_ context.Context, userID, id string) (*Notification, error) {
@@ -84,6 +121,64 @@ func TestCreateSanitizesSensitiveMetadata(t *testing.T) {
 	}
 	if store.created[0].Metadata["order_id"] != "order-1" {
 		t.Fatalf("metadata = %+v, want order_id preserved", store.created[0].Metadata)
+	}
+}
+
+func TestDefaultPreferencesEnabled(t *testing.T) {
+	store := &fakeNotificationStore{}
+	service := NewService(store)
+
+	prefs, err := service.GetPreferences(context.Background(), "user-1")
+	if err != nil {
+		t.Fatalf("GetPreferences error = %v", err)
+	}
+	if !prefs.OrderUpdatesEnabled || !prefs.PaymentUpdatesEnabled || !prefs.ReturnUpdatesEnabled || !prefs.PromotionEnabled {
+		t.Fatalf("prefs = %+v, want all enabled by default", prefs)
+	}
+}
+
+func TestUpdatePreferencesUsesAuthenticatedUser(t *testing.T) {
+	disabled := false
+	store := &fakeNotificationStore{}
+	service := NewService(store)
+
+	prefs, err := service.UpdatePreferences(context.Background(), "user-1", UpdatePreferencesInput{
+		PaymentUpdatesEnabled: &disabled,
+	})
+	if err != nil {
+		t.Fatalf("UpdatePreferences error = %v", err)
+	}
+	if store.updateUserID != "user-1" || prefs.PaymentUpdatesEnabled {
+		t.Fatalf("update = user:%s prefs:%+v, want user-1 with payment disabled", store.updateUserID, prefs)
+	}
+	if !prefs.OrderUpdatesEnabled || !prefs.ReturnUpdatesEnabled || !prefs.PromotionEnabled {
+		t.Fatalf("partial update should preserve enabled defaults: %+v", prefs)
+	}
+}
+
+func TestCreateSkipsDisabledPreference(t *testing.T) {
+	store := &fakeNotificationStore{preferences: map[string]*Preferences{
+		"user-1": {
+			UserID:                "user-1",
+			OrderUpdatesEnabled:   true,
+			PaymentUpdatesEnabled: false,
+			ReturnUpdatesEnabled:  true,
+			PromotionEnabled:      true,
+		},
+	}}
+	service := NewService(store)
+
+	item, err := service.Create(context.Background(), CreateInput{
+		UserID:  "user-1",
+		Type:    TypePaymentStatusUpdated,
+		Title:   "Payment updated",
+		Message: "Payment status changed.",
+	})
+	if err != nil {
+		t.Fatalf("Create error = %v", err)
+	}
+	if item != nil || len(store.created) != 0 {
+		t.Fatalf("item/created = %+v/%d, want skipped notification", item, len(store.created))
 	}
 }
 

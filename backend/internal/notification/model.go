@@ -32,3 +32,20 @@ type CreateInput struct {
 type ListFilter struct {
 	UnreadOnly bool
 }
+
+type Preferences struct {
+	UserID                string    `json:"user_id"`
+	OrderUpdatesEnabled   bool      `json:"order_updates_enabled"`
+	PaymentUpdatesEnabled bool      `json:"payment_updates_enabled"`
+	ReturnUpdatesEnabled  bool      `json:"return_updates_enabled"`
+	PromotionEnabled      bool      `json:"promotion_enabled"`
+	CreatedAt             time.Time `json:"created_at"`
+	UpdatedAt             time.Time `json:"updated_at"`
+}
+
+type UpdatePreferencesInput struct {
+	OrderUpdatesEnabled   *bool `json:"order_updates_enabled"`
+	PaymentUpdatesEnabled *bool `json:"payment_updates_enabled"`
+	ReturnUpdatesEnabled  *bool `json:"return_updates_enabled"`
+	PromotionEnabled      *bool `json:"promotion_enabled"`
+}

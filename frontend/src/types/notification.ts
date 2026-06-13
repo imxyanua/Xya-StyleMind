@@ -27,3 +27,7 @@ export type UserNotification = Omit<GeneratedNotification, "metadata"> & {
   read_at?: string | null;
   created_at: string;
 };
+
+export type NotificationPreferences = components["schemas"]["NotificationPreferences"];
+export type UpdateNotificationPreferencesInput =
+  components["schemas"]["UpdateNotificationPreferencesRequest"];

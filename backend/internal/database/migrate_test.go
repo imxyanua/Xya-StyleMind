@@ -192,6 +192,26 @@ func TestNotificationsMigrationHasIndexes(t *testing.T) {
 	}
 }
 
+func TestNotificationPreferencesMigrationHasDefaults(t *testing.T) {
+	sql := readMigrationForTest(t, "0014_create_notification_preferences.sql")
+
+	required := []string{
+		"CREATE TABLE IF NOT EXISTS notification_preferences",
+		"user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE",
+		"order_updates_enabled BOOLEAN NOT NULL DEFAULT TRUE",
+		"payment_updates_enabled BOOLEAN NOT NULL DEFAULT TRUE",
+		"return_updates_enabled BOOLEAN NOT NULL DEFAULT TRUE",
+		"promotion_enabled BOOLEAN NOT NULL DEFAULT TRUE",
+		"CREATE INDEX IF NOT EXISTS idx_notification_preferences_updated_at",
+	}
+
+	for _, text := range required {
+		if !strings.Contains(sql, text) {
+			t.Fatalf("notification preferences migration missing %q", text)
+		}
+	}
+}
+
 func migrationFilesForTest(t *testing.T) []string {
 	t.Helper()
 

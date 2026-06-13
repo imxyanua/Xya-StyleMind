@@ -4,7 +4,11 @@ import type { Cart } from "@/types/cart";
 import type { Category } from "@/types/category";
 import type { ApplyCouponResult, Coupon } from "@/types/coupon";
 import type { AdminDashboardStats } from "@/types/dashboard";
-import type { UserNotification } from "@/types/notification";
+import type {
+  NotificationPreferences,
+  UpdateNotificationPreferencesInput,
+  UserNotification,
+} from "@/types/notification";
 import type { components, operations } from "@/types/openapi";
 import type { Order } from "@/types/order";
 import type { Product } from "@/types/product";
@@ -298,6 +302,17 @@ export async function markNotificationRead(id: string) {
 export async function markAllNotificationsRead() {
   return apiRequest<MarkAllNotificationsReadResult>("/me/notifications/read-all", {
     method: "PATCH",
+  });
+}
+
+export async function fetchNotificationPreferences() {
+  return apiRequest<NotificationPreferences>("/me/notification-preferences", { method: "GET" });
+}
+
+export async function updateNotificationPreferences(input: UpdateNotificationPreferencesInput) {
+  return apiRequest<NotificationPreferences>("/me/notification-preferences", {
+    method: "PATCH",
+    body: JSON.stringify(input),
   });
 }
 

@@ -1532,6 +1532,63 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/me/notification-preferences:
+    get:
+      tags: [Notifications]
+      summary: Get current user's notification preferences
+      operationId: getMyNotificationPreferences
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Notification preferences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferencesResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags: [Notifications]
+      summary: Update current user's notification preferences
+      operationId: updateMyNotificationPreferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNotificationPreferencesRequest'
+            examples:
+              disablePayment:
+                value:
+                  payment_updates_enabled: false
+              allEnabled:
+                value:
+                  order_updates_enabled: true
+                  payment_updates_enabled: true
+                  return_updates_enabled: true
+                  promotion_enabled: true
+      responses:
+        '200':
+          description: Notification preferences updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferencesResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /api/v1/me/addresses:
     get:
       tags: [Profile]
@@ -2707,6 +2764,48 @@ components:
           type: string
         data:
           $ref: '#/components/schemas/MarkAllNotificationsReadResponse'
+    NotificationPreferences:
+      type: object
+      description: Per-user in-app notification preferences. All preferences default to enabled.
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        order_updates_enabled:
+          type: boolean
+        payment_updates_enabled:
+          type: boolean
+        return_updates_enabled:
+          type: boolean
+        promotion_enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UpdateNotificationPreferencesRequest:
+      type: object
+      properties:
+        order_updates_enabled:
+          type: boolean
+        payment_updates_enabled:
+          type: boolean
+        return_updates_enabled:
+          type: boolean
+        promotion_enabled:
+          type: boolean
+      additionalProperties: false
+    NotificationPreferencesResponseEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/NotificationPreferences'
     UserAddress:
       type: object
       properties:

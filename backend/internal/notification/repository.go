@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"stylemind/internal/errs"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -40,6 +41,63 @@ func (r *Repository) Create(ctx context.Context, input CreateInput) (*Notificati
 		return nil, err
 	}
 	return r.GetByIDForUser(ctx, id, input.UserID)
+}
+
+func (r *Repository) GetPreferences(ctx context.Context, userID string) (*Preferences, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT user_id, order_updates_enabled, payment_updates_enabled, return_updates_enabled,
+		       promotion_enabled, created_at, updated_at
+		FROM notification_preferences
+		WHERE user_id = $1
+	`, userID)
+	prefs, err := scanPreferences(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return defaultPreferences(userID), nil
+		}
+		return nil, err
+	}
+	return &prefs, nil
+}
+
+func (r *Repository) UpdatePreferences(ctx context.Context, userID string, input UpdatePreferencesInput) (*Preferences, error) {
+	current, err := r.GetPreferences(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if input.OrderUpdatesEnabled != nil {
+		current.OrderUpdatesEnabled = *input.OrderUpdatesEnabled
+	}
+	if input.PaymentUpdatesEnabled != nil {
+		current.PaymentUpdatesEnabled = *input.PaymentUpdatesEnabled
+	}
+	if input.ReturnUpdatesEnabled != nil {
+		current.ReturnUpdatesEnabled = *input.ReturnUpdatesEnabled
+	}
+	if input.PromotionEnabled != nil {
+		current.PromotionEnabled = *input.PromotionEnabled
+	}
+
+	row := r.db.QueryRow(ctx, `
+		INSERT INTO notification_preferences (
+			user_id, order_updates_enabled, payment_updates_enabled,
+			return_updates_enabled, promotion_enabled
+		)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (user_id) DO UPDATE SET
+			order_updates_enabled = EXCLUDED.order_updates_enabled,
+			payment_updates_enabled = EXCLUDED.payment_updates_enabled,
+			return_updates_enabled = EXCLUDED.return_updates_enabled,
+			promotion_enabled = EXCLUDED.promotion_enabled,
+			updated_at = NOW()
+		RETURNING user_id, order_updates_enabled, payment_updates_enabled, return_updates_enabled,
+		          promotion_enabled, created_at, updated_at
+	`, userID, current.OrderUpdatesEnabled, current.PaymentUpdatesEnabled, current.ReturnUpdatesEnabled, current.PromotionEnabled)
+	prefs, err := scanPreferences(row)
+	if err != nil {
+		return nil, err
+	}
+	return &prefs, nil
 }
 
 func (r *Repository) ListByUser(ctx context.Context, userID string, filter ListFilter, limit, offset int) ([]Notification, int64, error) {
@@ -137,6 +195,33 @@ func scanNotification(row scanner) (Notification, error) {
 		}
 	}
 	return item, nil
+}
+
+func scanPreferences(row scanner) (Preferences, error) {
+	var prefs Preferences
+	err := row.Scan(
+		&prefs.UserID,
+		&prefs.OrderUpdatesEnabled,
+		&prefs.PaymentUpdatesEnabled,
+		&prefs.ReturnUpdatesEnabled,
+		&prefs.PromotionEnabled,
+		&prefs.CreatedAt,
+		&prefs.UpdatedAt,
+	)
+	return prefs, err
+}
+
+func defaultPreferences(userID string) *Preferences {
+	now := time.Now().UTC()
+	return &Preferences{
+		UserID:                userID,
+		OrderUpdatesEnabled:   true,
+		PaymentUpdatesEnabled: true,
+		ReturnUpdatesEnabled:  true,
+		PromotionEnabled:      true,
+		CreatedAt:             now,
+		UpdatedAt:             now,
+	}
 }
 
 func buildWhere(userID string, filter ListFilter) (string, []any) {
