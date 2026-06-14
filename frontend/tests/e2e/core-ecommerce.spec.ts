@@ -65,7 +65,7 @@ async function authToken(page: Page) {
 
 async function markOrderPaid(orderID: string) {
   const client = new Client({
-    host: process.env.E2E_DB_HOST ?? "localhost",
+    host: process.env.E2E_DB_HOST ?? "127.0.0.1",
     port: Number(process.env.E2E_DB_PORT ?? "5432"),
     user: process.env.E2E_DB_USER ?? "postgres",
     password: process.env.E2E_DB_PASSWORD ?? "postgres",
@@ -86,7 +86,7 @@ async function createDefaultAddressThroughUi(page: Page) {
   await expect(page.getByRole("heading", { name: "Address Book" })).toBeVisible();
   await page.getByLabel("Recipient name").fill("E2E Saved Buyer");
   await page.getByLabel("Phone").fill("0909876543");
-  await page.getByLabel("Address").fill("77 Saved Address Lane");
+  await page.locator("#address_line").fill("77 Saved Address Lane");
   await page.getByLabel("City").fill("Ho Chi Minh City");
   await page.getByLabel("District").fill("District 7");
   await page.getByLabel("Delivery note").fill("Saved address note");
@@ -172,7 +172,7 @@ test("core ecommerce flows work against the real backend", async ({ page, reques
   await page.getByRole("button", { name: "Update" }).first().click();
   await expect(page.getByLabel("Recipient name")).toHaveValue("E2E Saved Buyer");
   await expect(page.getByLabel("Phone")).toHaveValue("0909876543");
-  await expect(page.getByLabel("Address")).toHaveValue("77 Saved Address Lane");
+  await expect(page.locator("#address_line")).toHaveValue("77 Saved Address Lane");
   await expect(page.getByLabel("City")).toHaveValue("Ho Chi Minh City");
   await expect(page.getByLabel("District")).toHaveValue("District 7");
   await expect(page.getByLabel("Delivery note")).toHaveValue("Saved address note");

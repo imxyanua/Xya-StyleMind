@@ -17,6 +17,7 @@ type Config struct {
 	JWTAudience           string
 	RequestTimeoutSeconds int64
 	MaxRequestBodyBytes   int64
+	AuthRateLimitRequests int
 	CORSAllowedOrigins    []string
 	Database              DatabaseConfig
 	Redis                 RedisConfig
@@ -50,6 +51,10 @@ func Load() Config {
 	if err != nil {
 		log.Fatalf("MAX_REQUEST_BODY_BYTES must be a positive integer: %v", err)
 	}
+	authRateLimitRequests, err := parsePositiveInt(getEnv("AUTH_RATE_LIMIT_REQUESTS", "10"))
+	if err != nil {
+		log.Fatalf("AUTH_RATE_LIMIT_REQUESTS must be a positive integer: %v", err)
+	}
 
 	cfg := Config{
 		AppEnv:                appEnv,
@@ -59,6 +64,7 @@ func Load() Config {
 		JWTAudience:           getEnv("JWT_AUDIENCE", "stylemind-web"),
 		RequestTimeoutSeconds: requestTimeoutSeconds,
 		MaxRequestBodyBytes:   maxRequestBodyBytes,
+		AuthRateLimitRequests: authRateLimitRequests,
 		CORSAllowedOrigins:    getEnvList("CORS_ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -108,6 +114,17 @@ func getEnvList(key string, fallback []string) []string {
 
 func parsePositiveInt64(value string) (int64, error) {
 	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	if parsed <= 0 {
+		return 0, strconv.ErrSyntax
+	}
+	return parsed, nil
+}
+
+func parsePositiveInt(value string) (int, error) {
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
 	if err != nil {
 		return 0, err
 	}

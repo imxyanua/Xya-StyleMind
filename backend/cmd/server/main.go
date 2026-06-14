@@ -60,7 +60,7 @@ func main() {
 	} else {
 		log.Printf("rate limiter using in-memory fallback; set REDIS_ADDR for multi-instance deployments")
 	}
-	authRateLimit := middleware.NewRateLimiter(rateLimitStore, 10, time.Minute, middleware.WithFailClosed(redisConfigured))
+	authRateLimit := middleware.NewRateLimiter(rateLimitStore, cfg.AuthRateLimitRequests, time.Minute, middleware.WithFailClosed(redisConfigured))
 
 	tokenRevocationStore, tokenRevocationRedisConfigured, err := auth.NewTokenRevocationStoreFromConfig(cfg.Redis.Addr, cfg.Redis.Password, cfg.Redis.DB)
 	if err != nil {
