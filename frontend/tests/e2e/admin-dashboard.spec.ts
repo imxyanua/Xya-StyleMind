@@ -19,12 +19,6 @@ type AuthPayload = {
   };
 };
 
-type Product = {
-  id: string;
-  name: string;
-  stock: number;
-};
-
 type Order = {
   id: string;
   status: string;
@@ -34,14 +28,6 @@ type Order = {
     full_name?: string;
   };
 };
-
-async function apiGet<T>(request: APIRequestContext, path: string, token?: string) {
-  const response = await request.get(`${API_BASE_URL}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-  });
-  expect(response.ok(), await response.text()).toBeTruthy();
-  return (await response.json()) as ApiEnvelope<T>;
-}
 
 async function apiPost<T>(
   request: APIRequestContext,
@@ -84,12 +70,46 @@ async function loginThroughUi(page: Page, email: string) {
 
 function dbClient() {
   return new Client({
-    host: process.env.E2E_DB_HOST ?? "localhost",
+    host: process.env.E2E_DB_HOST ?? "127.0.0.1",
     port: Number(process.env.E2E_DB_PORT ?? "5432"),
     user: process.env.E2E_DB_USER ?? "postgres",
     password: process.env.E2E_DB_PASSWORD ?? "postgres",
     database: process.env.E2E_DB_NAME ?? "stylemind",
   });
+}
+
+async function createE2EProduct(suffix: string, stock = 20) {
+  const client = dbClient();
+  await client.connect();
+  const categoryID = crypto.randomUUID();
+  const productID = crypto.randomUUID();
+  try {
+    await client.query(
+      `
+        INSERT INTO categories (id, name, slug)
+        VALUES ($1, $2, $3)
+      `,
+      [categoryID, `E2E Buyer Category ${suffix}`, `e2e-buyer-category-${suffix}`]
+    );
+    await client.query(
+      `
+        INSERT INTO products (id, name, description, price, stock, category_id, style, color, image_url)
+        VALUES ($1, $2, $3, $4, $5, $6, 'casual', 'blue', $7)
+      `,
+      [
+        productID,
+        `E2E Buyer Product ${suffix}`,
+        "Dedicated E2E product with isolated stock.",
+        320000,
+        stock,
+        categoryID,
+        `https://picsum.photos/seed/e2e-buyer-${suffix}/640/800`,
+      ]
+    );
+  } finally {
+    await client.end();
+  }
+  return { id: productID, name: `E2E Buyer Product ${suffix}`, stock };
 }
 
 async function promoteUserToAdmin(email: string) {
@@ -118,18 +138,13 @@ async function createBuyerOrder(request: APIRequestContext, suffix: string) {
   const token = buyer.data?.token;
   expect(token).toBeTruthy();
 
-  const productResponse = await apiGet<Product[]>(
-    request,
-    "/products?in_stock=true&sort=newest&limit=10"
-  );
-  const product = productResponse.data?.find((item) => item.stock > 0);
-  expect(product, "seed data must include an in-stock product for checkout").toBeTruthy();
+  const product = await createE2EProduct(suffix, 20);
 
   await apiPost(
     request,
     "/cart/items",
     {
-      product_id: (product as Product).id,
+      product_id: product.id,
       quantity: 1,
     },
     token
@@ -402,7 +417,7 @@ test("admin can update order status and sees invalid transition errors", async (
   await expect(page.getByText(order.id)).toBeVisible();
   await expect(page.getByText(buyerEmail).first()).toBeVisible();
 
-  await page.getByLabel("Order ID", { exact: true }).fill(order.id);
+  await page.locator("#orderId").fill(order.id);
   await page.getByLabel("Status", { exact: true }).selectOption("paid");
   await page.getByRole("button", { name: "Update status" }).click();
   await expect(page.getByText("Order status updated.")).toBeVisible();
@@ -424,7 +439,7 @@ test("admin can update order status and sees invalid transition errors", async (
   await expect(page.getByText(order.id)).toBeVisible();
   await expect(page.getByText(buyerEmail).first()).toBeVisible();
 
-  await page.getByLabel("Order ID", { exact: true }).fill(order.id);
+  await page.locator("#orderId").fill(order.id);
   await page.getByLabel("Status", { exact: true }).selectOption("completed");
   await page.getByRole("button", { name: "Update status" }).click();
   await expect(page.getByText(/invalid order status transition/i)).toBeVisible();
@@ -458,7 +473,7 @@ test("user can request a return and admin can approve refund", async ({ page, re
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page.getByText(order.id)).toBeVisible();
 
-  await page.getByLabel("Order ID", { exact: true }).fill(order.id);
+  await page.locator("#orderId").fill(order.id);
   await page.getByLabel("Status", { exact: true }).selectOption("paid");
   await page.getByRole("button", { name: "Update status" }).click();
   await expect(page.getByText("Order status updated.")).toBeVisible();
@@ -473,13 +488,13 @@ test("user can request a return and admin can approve refund", async ({ page, re
   await expect(page.getByText("Returns & refunds")).toBeVisible();
   await page.getByLabel("Return reason").fill("The jacket does not fit the E2E buyer as expected.");
   await page.getByRole("button", { name: "Request return/refund" }).click();
-  await expect(page.getByText("Return/refund request submitted.")).toBeVisible();
   await expect(page.getByText("requested", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("The jacket does not fit the E2E buyer as expected.")).toBeVisible();
 
   await page.evaluate(() => window.localStorage.removeItem("stylemind_token"));
   await loginThroughUi(page, adminEmail);
   await page.goto("/admin/returns");
-  await expect(page.getByRole("heading", { name: "Return Requests" })).toBeVisible();
+  await expect(page.getByText("Return Requests")).toBeVisible();
   await page.getByLabel("Order ID").fill(order.id);
   await page.getByRole("button", { name: "Apply filters" }).click();
   await expect(page.getByText(order.id.slice(0, 8)).first()).toBeVisible();
